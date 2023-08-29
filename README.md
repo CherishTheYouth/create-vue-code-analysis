@@ -31,3 +31,6 @@ Note that the version number (`@3` or `@2`) MUST NOT be omitted, otherwise `npm`
 - [Vue CLI -> Vite Migration Guide from VueSchool.io](https://vueschool.io/articles/vuejs-tutorials/how-to-migrate-from-vue-cli-to-vite/)
 
 - [Tools / Plugins that help with auto migration](https://github.com/vitejs/awesome-vite#vue-cli)
+
+# create-vue-code-analysis
+my repo for analysis the create-vue
