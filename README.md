@@ -488,10 +488,206 @@ await esbuild.build({
 接下来开始进入正题，我们集中分析 `index.ts `即可了。
 
 ## 开始分析 index.ts 文件干了点啥
+相比于动辄几万行的库来说，index.ts 并不复杂，包括注释，只有短短的460多行。
+我们先整体浏览一遍代码，大致了解下这个文件是怎么做到在短短400多行就完成了一个如此解除的脚手架。
+
+经过3分钟的整体浏览，我们带着懵逼的情绪划到了文件的最底部，看到了这个程序的真谛，短短3行：
+```ts
+init().catch((e) => {
+  console.error(e)
+})
+```
+一切的一起都围绕 `init` 方法展开。
+
+接下来，我们一步一步，庖丁解牛，揭开美人的面纱。移步 init 方法。
 
 ```ts
+// index.ts
+async function init() {
+  ...
+
+  try {
+    // Prompts:
+    // - Project name:
+    //   - whether to overwrite the existing directory or not?
+    //   - enter a valid package name for package.json
+    // - Project language: JavaScript / TypeScript
+    // - Add JSX Support?
+    // - Install Vue Router for SPA development?
+    // - Install Pinia for state management?
+    // - Add Cypress for testing?
+    // - Add Playwright for end-to-end testing?
+    // - Add ESLint for code quality?
+    // - Add Prettier for code formatting?
+    result = await prompts(
+      [
+        {
+          name: 'projectName',
+          type: targetDir ? null : 'text',
+          message: 'Project name:',
+          initial: defaultProjectName,
+          onState: (state) => (targetDir = String(state.value).trim() || defaultProjectName)
+        },
+        {
+          name: 'shouldOverwrite',
+          type: () => (canSkipEmptying(targetDir) || forceOverwrite ? null : 'confirm'),
+          message: () => {
+            const dirForPrompt =
+              targetDir === '.' ? 'Current directory' : `Target directory "${targetDir}"`
+
+            return `${dirForPrompt} is not empty. Remove existing files and continue?`
+          }
+        },
+        ....
+      ],
+      {
+        onCancel: () => {
+          throw new Error(red('✖') + ' Operation cancelled')
+        }
+      }
+    )
+  } catch (cancelled) {
+    console.log(cancelled.message)
+    process.exit(1)
+  }
+
+  ...
+
+const templateRoot = path.resolve(__dirname, 'template')
+  const render = function render(templateName) {
+    const templateDir = path.resolve(templateRoot, templateName)
+    renderTemplate(templateDir, root)
+  }
+  // Render base template
+  render('base')
+
+  // Add configs.
+  if (needsJsx) {
+    render('config/jsx')
+  }
+  if (needsRouter) {
+    render('config/router')
+  }
+  
+  ...
+}
 ```
 
+程序有点长，但是流程非常清晰直白，堪称极简主义的典范，相比于 vue cli 的各种回调方法处理，它没有一丝一毫的拐弯抹角。
+其实也就二个部分：
+1. 询问你想要啥？；
+2. 你想要啥我就给你啥；
 
+### 1. 实现终端的交互逻辑，读取用户选择
+分析代码总是枯燥的，但是既然是读源码，那再枯燥也得坚持。最终我们还得回到代码上，逐行解析。请看
 
- 
+```ts
+ console.log()
+  console.log(
+    // 确定 Node.js 是否在终端上下文中运行的首选方法是检查 process.stdout.isTTY 属性的值是否为 true
+    process.stdout.isTTY && process.stdout.getColorDepth() > 8
+      ? banners.gradientBanner
+      : banners.defaultBanner
+  )
+  console.log()
+```
+
+![image-20230829230134126](https://cherish-1256678432.cos.ap-nanjing.myqcloud.com/typora/image-20230829230134126.png)
+
+这段代码主要就是为了实现脚本执行的这行标题了，判断脚本是否在终端中执行，然后判断终端环境是否能支持渐变色相关的能力，支持则输出一个渐变色的炫酷的 `banner` 提示，否则输出一个默认的朴素的 `banner` 提示。
+
+花里胡哨，但你不得不承认咋祖师爷的审美，vitepress 的全新UI风格真是绝绝子。
+
+```ts
+  const cwd = process.cwd() // 当前node.js 进程执行时的工作目录
+```
+也就是你在那个目录执行 `create-vue`, `cwd` 就是相应的目录了。
+
+```ts
+  /**
+   * @description process.argv
+   * process.argv 属性返回数组，其中包含启动 Node.js 进程时传入的命令行参数。
+   * 其中第一个元素是 Node.js 的可执行文件路径，
+   * 第二个元素是当前执行的 JavaScript 文件路径，之后的元素是命令行参数。
+   * 其余元素将是任何其他命令行参数。
+   *  process.argv.slice(2)，可去掉前两个元素，只保留命令行参数部分。
+   * 
+   * @description minimist
+   * 是一个用于解析命令行参数的 JavaScript 函数库。它可以将命令行参数解析为一个对象，方便在代码中进行处理和使用。
+   * minimist 的作用是将命令行参数解析为一个对象，其中参数名作为对象的属性，参数值作为对象的属性值。
+   * 它可以处理各种类型的命令行参数，包括带有选项标志的参数、带有值的参数以及没有值的参数。
+   * 
+   * minimist 函数返回一个对象，其中包含解析后的命令行参数。我们可以通过访问对象的属性来获取相应的命令行参数值。
+   * 假设我们在命令行中运行以下命令：
+   * `node example/parse.js -x 3 -y 4 -n5 -abc --beep=boop foo bar baz`
+   * 那么 minimist 将会解析这些命令行参数，并将其转换为以下对象：
+   * {
+      _: ['foo', 'bar', 'baz'],
+      x: 3,
+      y: 4,
+      n: 5,
+      a: true,
+      b: true,
+      c: true,
+      beep: 'boop'
+    }
+   * 这样，我们就可以在代码中使用 argv.name 和 argv.age 来获取相应的参数值。
+   * 除了基本的用法外，minimist 还提供了一些高级功能，例如设置默认值、解析布尔型参数等
+   * 
+   * const argv = minimist(args, opts={})
+   * argv._ 包含所有没有关联选项的参数;
+   * “--”之后的任何参数都不会被解析，并将以argv._结束
+   * options有：
+   * opts.string： 要始终视为字符串的字符串或字符串数组参数名称
+   * opts.boolean: 布尔值、字符串或字符串数组，始终视为布尔值。如果为true，则将所有不带等号的'--'参数视为布尔值
+   * 如 opts.boolean 设为 true, 则 --save 解析未 save: true
+   * 
+   * opts.default: 将字符串参数名映射到默认值的对象
+   * 
+   * opts.stopEarly: 当为true时，用第一个非选项后的所有内容填充argv._
+   * 
+   * opts.alias: 将字符串名称映射到字符串或字符串参数名称数组以用作别名的对象
+   * 
+   * opts['--']: 当为true时，用 '--' 之前的所有内容填充argv._; 用 '--' 之后的所有内容填充 argv['--']
+   * e.g.
+   * require('./')('one two three -- four five --six'.split(' '), { '--': true })
+    {
+      _: ['one', 'two', 'three'],
+      '--': ['four', 'five', '--six']
+    }
+  * opts.unknown: 用一个命令行参数调用的函数，该参数不是在opts配置对象中定义的。如果函数返回false，则未知选项不会添加到argv。
+  */
+
+  // possible options:
+  // --default
+  // --typescript / --ts
+  // --jsx
+  // --router / --vue-router
+  // --pinia
+  // --with-tests / --tests (equals to `--vitest --cypress`)
+  // --vitest
+  // --cypress
+  // --playwright
+  // --eslint
+  // --eslint-with-prettier (only support prettier through eslint for simplicity)
+  // --force (for force overwriting)
+  const argv = minimist(process.argv.slice(2), {
+    alias: {
+      typescript: ['ts'],
+      'with-tests': ['tests'],
+      router: ['vue-router']
+    },
+    string: ['_'],
+    // all arguments are treated as booleans
+    boolean: true
+  })
+```
+- process.argv
+
+process.argv 属性返回数组，其中包含启动 Node.js 进程时传入的命令行参数。其中第一个元素是 Node.js 的可执行文件路径，第二个元素是当前执行的 JavaScript 文件路径，之后的元素是命令行参数。process.argv.slice(2)，可去掉前两个元素，只保留命令行参数部分。
+
+![image-20230829231511469](https://cherish-1256678432.cos.ap-nanjing.myqcloud.com/typora/image-20230829231511469.png)
+
+如图的示例，使用 `ts-node` 执行 `index.ts` 文件，所以 `process.argv` 的第一个参数是 `ts-node` 的可执行文件的路径，第二个参数是被执行的 ts 文件的路径，也就是 `index.ts` 的路径，如果有其他参数，则从 `process.argv` 数组的第三个元素开始。
+
+![image-20230829232834955](https://cherish-1256678432.cos.ap-nanjing.myqcloud.com/typora/image-20230829232834955.png)
