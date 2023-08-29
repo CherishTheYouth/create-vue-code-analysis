@@ -1,0 +1,4 @@
+packages:
+  - 'template/base'
+  - 'template/config/**'
+  - 'template/tsconfig/**'

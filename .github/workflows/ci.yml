@@ -1,0 +1,190 @@
+name: 'ci'
+on:
+  push:
+    branches:
+      - '**'
+      - '!renovate/**'
+    paths-ignore:
+      - README.md
+      - CONTRIBUTING.md
+  pull_request:
+    branches:
+      - '**'
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    name: Build the package
+    steps:
+      - uses: actions/checkout@v3
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: 'pnpm'
+      - run: pnpm install
+        env:
+          CYPRESS_INSTALL_BINARY: 0
+      - run: pnpm build
+
+      # Use cache to share the output across different jobs
+      # No need to cache node_modules because they are all bundled
+      - uses: actions/cache/save@v3
+        id: cache
+        with:
+          path: outfile.cjs
+          key: ${{ github.sha }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+  test:
+    needs: build
+    strategy:
+      matrix:
+        flag-for-ts: ['', '--typescript']
+        flag-for-jsx: ['', '--jsx']
+        flag-for-router: ['', '--router']
+        flag-for-pinia: ['', '--pinia']
+        flag-for-vitest: ['', '--vitest']
+
+        # It's quite costly to install Cypress & Playwright even with cache.
+        # Maybe we can split them into another job so that all the projects
+        # can share the same binary installation.
+        flag-for-e2e: ['', '--cypress', '--playwright']
+
+        # Skip ESLint/Prettier tests as we've reached the limit of job numbers
+        # TODO: Find a way to test them without adding new jobs
+
+        node-version: [18]
+        os: [ubuntu-latest]
+
+        # Run a few tests on other systems and Node.js versions
+        include:
+          - node-version: 18
+            os: windows-latest
+            flag-for-ts: '--typescript'
+            flag-for-jsx: '--jsx'
+            flag-for-router: '--router'
+            flag-for-pinia: '--pinia'
+            flag-for-vitest: '--vitest'
+            flag-for-e2e: '--cypress'
+
+          - node-version: 18
+            os: macos-latest
+            flag-for-ts: '--typescript'
+            flag-for-jsx: '--jsx'
+            flag-for-router: '--router'
+            flag-for-pinia: '--pinia'
+            flag-for-vitest: '--vitest'
+            flag-for-e2e: '--cypress'
+
+          - node-version: 20
+            os: ubuntu-latest
+            flag-for-ts: '--typescript'
+            flag-for-jsx: '--jsx'
+            flag-for-router: '--router'
+            flag-for-pinia: '--pinia'
+            flag-for-vitest: '--vitest'
+            flag-for-e2e: '--cypress'
+
+          - node-version: 16
+            os: ubuntu-latest
+            flag-for-ts: '--typescript'
+            flag-for-jsx: '--jsx'
+            flag-for-router: '--router'
+            flag-for-pinia: '--pinia'
+            flag-for-vitest: '--vitest'
+            flag-for-e2e: '--cypress'
+    runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.os == 'windows-latest' }}
+    env:
+      FEATURE_FLAGS: ${{ matrix.flag-for-ts }} ${{ matrix.flag-for-jsx }} ${{ matrix.flag-for-router }} ${{ matrix.flag-for-pinia }} ${{ matrix.flag-for-vitest }} ${{ matrix.flag-for-e2e }}
+      # Sometimes the Linux runner can't verify Cypress in 30s
+      CYPRESS_VERIFY_TIMEOUT: 60000
+    steps:
+      - uses: actions/checkout@v3
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+      - uses: actions/cache/restore@v3
+        id: cache-restore
+        with:
+          path: outfile.cjs
+          key: ${{ github.sha }}-${{ hashFiles('pnpm-lock.yaml') }}
+      - name: Build the package on cache miss
+        if: steps.cache-restore.outputs.cache-hit != 'true'
+        run: pnpm install && pnpm build
+
+      # https://github.com/vitejs/vite/blob/main/.github/workflows/ci.yml#L62
+      # Install playwright's binary under custom directory to cache
+      - name: Set Playwright & Cypress path
+        if: runner.os != 'Windows'
+        run: |
+          echo "PLAYWRIGHT_BROWSERS_PATH=$HOME/.cache/playwright-bin" >> $GITHUB_ENV
+          echo "CYPRESS_CACHE_FOLDER=$HOME/.cache/cypress-bin" >> $GITHUB_ENV
+      - name: Set Playwright & Cypress path (windows)
+        if: runner.os == 'Windows'
+        run: |
+          echo "PLAYWRIGHT_BROWSERS_PATH=$HOME\.cache\playwright-bin" >> $env:GITHUB_ENV
+          echo "CYPRESS_CACHE_FOLDER=$HOME\.cache\cypress-bin" >> $env:GITHUB_ENV
+
+      - if: ${{ contains(matrix.flag-for-e2e, '--cypress') }}
+        name: Cache Cypress binaries
+        id: cache-cypress
+        uses: actions/cache@v3
+        with:
+          # TODO: avoid snowballing by adding version
+          key: ${{ runner.os }}-cypress-bin
+          path: ${{ env.CYPRESS_CACHE_FOLDER }}
+
+      - if: ${{ contains(matrix.flag-for-e2e, '--playwright') }}
+        name: Cache Playwright's binary
+        uses: actions/cache@v3
+        with:
+          # Playwright removes unused browsers automatically
+          # So does not need to add playwright version to key
+          key: ${{ runner.os }}-playwright-bin-v1
+          path: ${{ env.PLAYWRIGHT_BROWSERS_PATH }}
+
+      - if: ${{ (contains(env.FEATURE_FLAGS, '--')) }}
+        name: Create the sample project with feature flags
+        working-directory: ../
+        run: node ./create-vue/outfile.cjs sample-project ${{ env.FEATURE_FLAGS }}
+
+      - if: ${{ !(contains(env.FEATURE_FLAGS, '--')) }}
+        name: Create the sample project with default options
+        working-directory: ../
+        run: node ./create-vue/outfile.cjs sample-project --default
+
+      - name: Install dependencies in the sample project
+        working-directory: ../sample-project
+        run: pnpm install
+
+      - if: ${{ contains(matrix.flag-for-vitest, '--') }}
+        name: Run unit test script
+        working-directory: ../sample-project
+        run: pnpm test:unit
+
+      - name: Run build script
+        working-directory: ../sample-project
+        run: pnpm build
+
+      - name: Download Cypress
+        if: ${{ contains(matrix.flag-for-e2e, '--cypress') }}
+        working-directory: ../sample-project
+        run: |
+          pnpm exec cypress cache list
+          pnpm exec cypress install
+
+      - if: ${{ contains(matrix.flag-for-e2e, '--playwright') }}
+        name: Install Playwright dependencies
+        working-directory: ../sample-project
+        run: npx playwright install --with-deps
+
+      - if: ${{ contains(matrix.flag-for-e2e, '--') }}
+        name: Run e2e test script
+        working-directory: ../sample-project
+        run: pnpm test:e2e

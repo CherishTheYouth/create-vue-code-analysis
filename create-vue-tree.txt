@@ -1,0 +1,39 @@
+F:\Study\Vue\Code\VueSourceCode\create-vue
+├── CONTRIBUTING.md
+├── create-vue-tree.txt
+├── index.ts
+├── LICENSE
+├── media
+|  └── screenshot-cli.png
+├── package.json
+├── playground
+├── pnpm-lock.yaml
+├── pnpm-workspace.yaml
+├── README.md
+├── renovate.json
+├── scripts
+|  ├── build.mjs
+|  ├── prepublish.mjs
+|  ├── snapshot.mjs
+|  └── test.mjs
+├── template
+|  ├── base
+|  ├── code
+|  ├── config
+|  ├── entry
+|  ├── eslint
+|  └── tsconfig
+├── tsconfig.json
+└── utils
+   ├── banners.ts
+   ├── deepMerge.ts
+   ├── directoryTraverse.ts
+   ├── generateReadme.ts
+   ├── getCommand.ts
+   ├── renderEslint.ts
+   ├── renderTemplate.ts
+   └── sortDependencies.ts
+
+directory: 14 file: 23 symboliclink: 10
+
+ignored: directory (1)
