@@ -411,7 +411,7 @@ npm create vue@3
 
 以下内容copy自参考资料：
 
-> ## npm `init` / `create` 命令
+> **npm `init` / `create` 命令**
 >
 > npm v6 版本给 `init` 命令添加了别名 `create`，俩命令一样的.
 >
@@ -430,7 +430,7 @@ npm create vue@3
 > 
 > ```
 >
-> ## 执行 `npm create vite` 发生了什么？
+> **执行 `npm create vite` 发生了什么？**
 >
 > 当我们执行 `npm create vite` 时，会先补全包名为 `create-vite`，转换为使用 `npm exec` 命令执行，即 `npm exec create-vite`，接着执行包对应的 `create-vite` 命令（如果本地未安装 `create-vite` 包则先安装再执行）.
 
