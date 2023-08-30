@@ -7,149 +7,6 @@
 ```txt
 F:\Study\Vue\Code\VueSourceCode\create-vue
 ├── CONTRIBUTING.md
-├── index.ts
-├── LICENSE
-├── media
-|  └── screenshot-cli.png
-├── package.json
-├── playground
-├── pnpm-lock.yaml
-├── pnpm-workspace.yaml
-├── README.md
-├── renovate.json
-├── scripts
-|  ├── build.mjs
-|  ├── prepublish.mjs
-|  ├── snapshot.mjs
-|  └── test.mjs
-├── template
-|  ├── base
-|  |  ├── index.html
-|  |  ├── package.json
-|  |  ├── public
-|  |  |  └── favicon.ico
-|  |  ├── src
-|  |  |  └── assets
-|  |  |     ├── base.css
-|  |  |     ├── logo.svg
-|  |  |     └── main.css
-|  |  ├── vite.config.js
-|  |  └── _gitignore
-|  ├── code
-|  |  ├── default
-|  |  |  └── src
-|  |  |     ├── App.vue
-|  |  |     └── components
-|  |  ├── router
-|  |  |  └── src
-|  |  |     ├── App.vue
-|  |  |     ├── components
-|  |  |     ├── router
-|  |  |     └── views
-|  |  ├── typescript-default
-|  |  |  └── src
-|  |  |     ├── App.vue
-|  |  |     └── components
-|  |  └── typescript-router
-|  |     └── src
-|  |        ├── App.vue
-|  |        ├── components
-|  |        ├── router
-|  |        └── views
-|  ├── config
-|  |  ├── cypress
-|  |  |  ├── cypress
-|  |  |  |  ├── e2e
-|  |  |  |  ├── fixtures
-|  |  |  |  └── support
-|  |  |  ├── cypress.config.js
-|  |  |  ├── cypress.config.ts
-|  |  |  └── package.json
-|  |  ├── cypress-ct
-|  |  |  ├── cypress
-|  |  |  |  └── support
-|  |  |  ├── cypress.config.js
-|  |  |  ├── cypress.config.ts
-|  |  |  ├── package.json
-|  |  |  └── src
-|  |  |     └── components
-|  |  ├── jsx
-|  |  |  ├── package.json
-|  |  |  └── vite.config.js
-|  |  ├── pinia
-|  |  |  ├── package.json
-|  |  |  └── src
-|  |  |     └── stores
-|  |  ├── playwright
-|  |  |  ├── e2e
-|  |  |  |  ├── vue.spec.js
-|  |  |  |  └── vue.spec.ts
-|  |  |  ├── package.json
-|  |  |  ├── playwright.config.js
-|  |  |  ├── playwright.config.ts
-|  |  |  └── _gitignore
-|  |  ├── router
-|  |  |  └── package.json
-|  |  ├── typescript
-|  |  |  ├── env.d.ts
-|  |  |  └── package.json
-|  |  └── vitest
-|  |     ├── package.json
-|  |     ├── src
-|  |     |  └── components
-|  |     └── vitest.config.js
-|  ├── entry
-|  |  ├── default
-|  |  |  └── src
-|  |  |     └── main.js
-|  |  ├── pinia
-|  |  |  └── src
-|  |  |     └── main.js
-|  |  ├── router
-|  |  |  └── src
-|  |  |     └── main.js
-|  |  └── router-and-pinia
-|  |     └── src
-|  |        └── main.js
-|  ├── eslint
-|  |  └── package.json
-|  └── tsconfig
-|     ├── base
-|     |  ├── package.json
-|     |  ├── tsconfig.app.json
-|     |  ├── tsconfig.json
-|     |  └── tsconfig.node.json
-|     ├── cypress
-|     |  └── cypress
-|     |     └── e2e
-|     ├── cypress-ct
-|     |  ├── package.json
-|     |  ├── tsconfig.cypress-ct.json
-|     |  └── tsconfig.json
-|     ├── playwright
-|     |  └── e2e
-|     |     └── tsconfig.json
-|     └── vitest
-|        ├── package.json
-|        ├── tsconfig.json
-|        └── tsconfig.vitest.json
-├── tsconfig.json
-└── utils
-   ├── banners.ts
-   ├── deepMerge.ts
-   ├── directoryTraverse.ts
-   ├── generateReadme.ts
-   ├── getCommand.ts
-   ├── renderEslint.ts
-   ├── renderTemplate.ts
-   └── sortDependencies.ts
-```
-
-放一个层级浅些的：
-
-```txt
-F:\Study\Vue\Code\VueSourceCode\create-vue
-├── CONTRIBUTING.md
 ├── create-vue-tree.txt
 ├── index.ts
 ├── LICENSE
@@ -768,4 +625,191 @@ const templateRoot = path.resolve(__dirname, 'template')
   // --force { force: true }
 ```
 
-以上两部分
+以上这一部分主要是在输入 `cli` 指令时的一些选项的实现。
+
+接下来是提示功能。提示功能会引导用户根据自己的需求选择不同的项目配置。
+
+如图所示，这是 `create-vue` 的提示模块：
+
+![截屏2023-08-30 23.14.59](https://cherish-1256678432.cos.ap-nanjing.myqcloud.com/typora/%E6%88%AA%E5%B1%8F2023-08-30%2023.14.59.png)
+
+```tsx
+// if any of the feature flags is set, we would skip the feature prompts
+// 翻译一下：如果在上面讲述的部分，已经使用终端指令确定了安装选项，那么下文中相关的
+  const isFeatureFlagsUsed =
+    typeof (
+      argv.default ??
+      argv.ts ??
+      argv.jsx ??
+      argv.router ??
+      argv.pinia ??
+      argv.tests ??
+      argv.vitest ??
+      argv.cypress ??
+      argv.playwright ??
+      argv.eslint
+    ) === 'boolean'
+
+  let targetDir = argv._[0]
+  const defaultProjectName = !targetDir ? 'vue-project' : targetDir
+
+  const forceOverwrite = argv.force
+
+  let result: {
+    projectName?: string
+    shouldOverwrite?: boolean
+    packageName?: string
+    needsTypeScript?: boolean
+    needsJsx?: boolean
+    needsRouter?: boolean
+    needsPinia?: boolean
+    needsVitest?: boolean
+    needsE2eTesting?: false | 'cypress' | 'playwright'
+    needsEslint?: boolean
+    needsPrettier?: boolean
+  } = {}
+
+  try {
+    // Prompts:
+    // - Project name:
+    //   - whether to overwrite the existing directory or not?
+    //   - enter a valid package name for package.json
+    // - Project language: JavaScript / TypeScript
+    // - Add JSX Support?
+    // - Install Vue Router for SPA development?
+    // - Install Pinia for state management?
+    // - Add Cypress for testing?
+    // - Add Playwright for end-to-end testing?
+    // - Add ESLint for code quality?
+    // - Add Prettier for code formatting?
+    result = await prompts(
+      [
+        {
+          name: 'projectName',
+          type: targetDir ? null : 'text',
+          message: 'Project name:',
+          initial: defaultProjectName,
+          onState: (state) => (targetDir = String(state.value).trim() || defaultProjectName)
+        },
+        {
+          name: 'shouldOverwrite',
+          type: () => (canSkipEmptying(targetDir) || forceOverwrite ? null : 'confirm'),
+          message: () => {
+            const dirForPrompt =
+              targetDir === '.' ? 'Current directory' : `Target directory "${targetDir}"`
+
+            return `${dirForPrompt} is not empty. Remove existing files and continue?`
+          }
+        },
+        {
+          name: 'overwriteChecker',
+          type: (prev, values) => {
+            if (values.shouldOverwrite === false) {
+              throw new Error(red('✖') + ' Operation cancelled')
+            }
+            return null
+          }
+        },
+        {
+          name: 'packageName',
+          type: () => (isValidPackageName(targetDir) ? null : 'text'),
+          message: 'Package name:',
+          initial: () => toValidPackageName(targetDir),
+          validate: (dir) => isValidPackageName(dir) || 'Invalid package.json name'
+        },
+        {
+          name: 'needsTypeScript',
+          type: () => (isFeatureFlagsUsed ? null : 'toggle'),
+          message: 'Add TypeScript?',
+          initial: false,
+          active: 'Yes',
+          inactive: 'No'
+        },
+        {
+          name: 'needsJsx',
+          type: () => (isFeatureFlagsUsed ? null : 'toggle'),
+          message: 'Add JSX Support?',
+          initial: false,
+          active: 'Yes',
+          inactive: 'No'
+        },
+        {
+          name: 'needsRouter',
+          type: () => (isFeatureFlagsUsed ? null : 'toggle'),
+          message: 'Add Vue Router for Single Page Application development?',
+          initial: false,
+          active: 'Yes',
+          inactive: 'No'
+        },
+        {
+          name: 'needsPinia',
+          type: () => (isFeatureFlagsUsed ? null : 'toggle'),
+          message: 'Add Pinia for state management?',
+          initial: false,
+          active: 'Yes',
+          inactive: 'No'
+        },
+        {
+          name: 'needsVitest',
+          type: () => (isFeatureFlagsUsed ? null : 'toggle'),
+          message: 'Add Vitest for Unit Testing?',
+          initial: false,
+          active: 'Yes',
+          inactive: 'No'
+        },
+        {
+          name: 'needsE2eTesting',
+          type: () => (isFeatureFlagsUsed ? null : 'select'),
+          message: 'Add an End-to-End Testing Solution?',
+          initial: 0,
+          choices: (prev, answers) => [
+            { title: 'No', value: false },
+            {
+              title: 'Cypress',
+              description: answers.needsVitest
+                ? undefined
+                : 'also supports unit testing with Cypress Component Testing',
+              value: 'cypress'
+            },
+            {
+              title: 'Playwright',
+              value: 'playwright'
+            }
+          ]
+        },
+        {
+          name: 'needsEslint',
+          type: () => (isFeatureFlagsUsed ? null : 'toggle'),
+          message: 'Add ESLint for code quality?',
+          initial: false,
+          active: 'Yes',
+          inactive: 'No'
+        },
+        {
+          name: 'needsPrettier',
+          type: (prev, values) => {
+            if (isFeatureFlagsUsed || !values.needsEslint) {
+              return null
+            }
+            return 'toggle'
+          },
+          message: 'Add Prettier for code formatting?',
+          initial: false,
+          active: 'Yes',
+          inactive: 'No'
+        }
+      ],
+      {
+        onCancel: () => {
+          throw new Error(red('✖') + ' Operation cancelled')
+        }
+      }
+    )
+  } catch (cancelled) {
+    console.log(cancelled.message)
+    process.exit(1)
+  }
+```
+
+
+
