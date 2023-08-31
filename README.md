@@ -635,7 +635,9 @@ const templateRoot = path.resolve(__dirname, 'template')
 
 ```tsx
 // if any of the feature flags is set, we would skip the feature prompts
-// 翻译一下：如果在上面讲述的部分，已经使用终端指令确定了安装选项，那么下文中相关的
+// 翻译一下：如果在上面讲述的部分，已经使用终端指令确定了安装选项，那么下文中相关的模块的提示项就会被跳过。
+// 如果在 create-vue project-name 后附加了任何以下的选项，则此状态为true，如：create-vue project-name --ts
+// ?? 是 空值合并操作符，当左侧的操作数为 null 或者 undefined 时，返回其右侧操作数，否则返回左侧操作数
   const isFeatureFlagsUsed =
     typeof (
       argv.default ??
@@ -810,6 +812,206 @@ const templateRoot = path.resolve(__dirname, 'template')
     process.exit(1)
   }
 ```
+
+先看第一段：
+
+```ts
+// if any of the feature flags is set, we would skip the feature prompts
+// 翻译一下：如果在上面讲述的部分，已经使用终端指令确定了安装选项，那么下文中相关的提示项就会被跳过。
+// 如果在 create-vue project-name 后附加了任何以下的选项，则此状态为true，如：create-vue project-name --ts
+// ?? 是 空值合并操作符，当左侧的操作数为 null 或者 undefined 时，返回其右侧操作数，否则返回左侧操作数
+  const isFeatureFlagsUsed =
+    typeof (
+      argv.default ??
+      argv.ts ??
+      argv.jsx ??
+      argv.router ??
+      argv.pinia ??
+      argv.tests ??
+      argv.vitest ??
+      argv.cypress ??
+      argv.playwright ??
+      argv.eslint
+    ) === 'boolean'
+  
+  // 以下是此字段控制的部分逻辑, 可以看到，当 isFeatureFlagsUsed 为 true 时，prompts 的type值为 null.此时此提示会跳过
+  result = await prompts(
+      [
+          ....
+      	{
+          name: 'needsTypeScript',
+          type: () => (isFeatureFlagsUsed ? null : 'toggle'),
+          message: 'Add TypeScript?',
+          initial: false,
+          active: 'Yes',
+          inactive: 'No'
+        },
+        {
+          name: 'needsJsx',
+          type: () => (isFeatureFlagsUsed ? null : 'toggle'),
+          message: 'Add JSX Support?',
+          initial: false,
+          active: 'Yes',
+          inactive: 'No'
+        },
+        ...
+      ])
+```
+
+如果在 create-vue project-name 后附加了任何以下的选项，则此状态为true，如：`create-vue project-name --ts`.
+
+只要输入任意一个选项，则以下的所有提示选项都将跳过，直接执行 cli。以下是测试结果：
+
+![image-20230831192059089](https://cherish-1256678432.cos.ap-nanjing.myqcloud.com/typora/image-20230831192059089.png)
+
+然后在是这一部分：
+
+```ts
+  let targetDir = argv._[0]
+  const defaultProjectName = !targetDir ? 'vue-project' : targetDir
+  const forceOverwrite = argv.force
+```
+
+根据以上对  `argv` 的解析，`argv._ ` 是一个数组，其中的值是我们输入的目标文件夹名称， 如下示例：
+
+```bash
+> ts-node index.ts up-web-vue
+```
+
+得到的 `argv._` 的值为: `['up-web-vue']`.
+
+![image-20230831193020240](https://cherish-1256678432.cos.ap-nanjing.myqcloud.com/typora/image-20230831193020240.png)
+
+所以，`targetDir` 即为你希望脚手架为你生成的项目的文件夹名称，`defaultProjectName` 则是未指定文件夹名称时的默认名称。
+
+`argv.force` 值即为 `ts-node index.ts up-web-vue --force` 时 `force` 的值，是强制覆盖选项的快捷指令，如果使用此选项，则后面则不会弹出询问是否强制覆盖的选项。
+
+```ts
+...
+{
+  name: 'shouldOverwrite',
+      // forceOverwrite 为 true 时跳过
+  type: () => (canSkipEmptying(targetDir) || forceOverwrite ? null : 'confirm'),
+  message: () => {
+    const dirForPrompt =
+      targetDir === '.' ? 'Current directory' : `Target directory "${targetDir}"`
+
+    return `${dirForPrompt} is not empty. Remove existing files and continue?`
+  }
+},
+....
+// 判断 dir 文件夹是否是空文件夹
+function canSkipEmptying(dir: string) {
+  // dir目录不存在，则当然是空目录
+  if (!fs.existsSync(dir)) {
+    return true
+  }
+
+  // 读取dir内的文件
+  const files = fs.readdirSync(dir)
+  // 无文件，当然是空目录
+  if (files.length === 0) {
+    return true
+  }
+  // 仅有.git目录，则同样视为一个空目录
+  if (files.length === 1 && files[0] === '.git') {
+    return true
+  }
+
+  return false
+}
+```
+
+当然，如果目标目录是空母录，自然也会跳过此提示。`canSkipEmptying()` 方法即用来判断是否是空目录。
+
+```ts
+  let result: {
+    projectName?: string
+    shouldOverwrite?: boolean
+    packageName?: string
+    needsTypeScript?: boolean
+    needsJsx?: boolean
+    needsRouter?: boolean
+    needsPinia?: boolean
+    needsVitest?: boolean
+    needsE2eTesting?: false | 'cypress' | 'playwright'
+    needsEslint?: boolean
+    needsPrettier?: boolean
+  } = {}
+  // 定义一个result对象，prompts 提示的结果保存在此对象中。
+```
+
+以上定义一个 `result` ，从其类型的定义不难看出，该对象用来保存 prompts 提示结束后用户选择的结果。
+
+接下来介绍生成项目之前的 prompts 提示部分。首先，先大致了解下 `prompts `库的用法：
+>[prompts]([prompts - npm (npmjs.com)](https://www.npmjs.com/package/prompts))
+>
+>prompts 是一个用于创建交互式命令行提示的 JavaScript 库。它可以方便地与用户进行命令行交互，接收用户输入的值，并根据用户的选择执行相应的操作。在 prompts 中，问题对象（prompt object）是用于定义交互式提示的配置信息。它包含了一些属性，用于描述问题的类型、提示信息、默认值等。
+>
+>下面是 `prompt object` 的常用属性及其作用：
+>
+>- type：指定问题的类型，可以是 'text'、'number'、'confirm'、'select'、'multiselect'、‘null’ 等。不同的类型会影响用户交互的方式和输入值的类型。当为 `null` 时会跳过，当前对话。
+>- name：指定问题的名称，用于标识用户输入的值。在返回的结果对象中，每个问题的名称都会作为属性名，对应用户的输入值。
+>- message：向用户展示的提示信息。可以是一个字符串，也可以是一个函数，用于动态生成提示信息。
+>- initial：指定问题的默认值。用户可以直接按下回车键接受默认值，或者输入新的值覆盖默认值。
+>- validate：用于验证用户输入值的函数。它接受用户输入的值作为参数，并返回一个布尔值或一个字符串。如果返回布尔值 false，表示输入值无效；如果返回字符串，则表示输入值无效的错误提示信息。
+>- format：用于格式化用户输入值的函数。它接受用户输入的值作为参数，并返回一个格式化后的值。可以用于对输入值进行预处理或转换。
+>- choices：用于指定选择型问题的选项。它可以是一个字符串数组，也可以是一个对象数组。每个选项可以包含 title 和 value 属性，分别用于展示选项的文本和对应的值。
+>- onRender：在问题被渲染到终端之前触发的回调函数。它接受一个参数 prompt，可以用于修改问题对象的属性或执行其他操作。例如，你可以在 onRender 回调中动态修改提示信息，根据不同的条件显示不同的信息。
+>- onState：在用户输入值发生变化时触发的回调函数。它接受两个参数 state 和 prompt，分别表示当前的状态对象和问题对象。
+>- onSubmit：在用户完成所有问题的回答并提交之后触发的回调函数。它接受一个参数 result，表示用户的回答结果。你可以在 onSubmit 回调中根据用户的回答执行相应的操作，例如保存数据、发送请求等。
+
+接下来结合代码来分析，每个提示项的作用分别是啥。
+
+```ts
+{
+  name: 'projectName',
+  type: targetDir ? null : 'text',
+  message: 'Project name:',
+  initial: defaultProjectName,
+  onState: (state) => (targetDir = String(state.value).trim() || defaultProjectName)
+},
+```
+
+项目名称，这里如果在运行 cli 时**未输入**项目名称，则会展示此选项，默认选项为 `defaultProjectName`, 在用户确认操作后，将输入值作为生成目录的文件夹名。
+
+如果运行 cli 时已输入项目名称，则此提示会跳过。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

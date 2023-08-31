@@ -30,7 +30,7 @@ function toValidPackageName(projectName) {
     .replace(/[^a-z0-9-~]+/g, '-')
 }
 
-// 对空文件夹跳过某种处理？// TODO 什么处理呢？
+// 判断 dir 文件夹是否是空文件夹
 function canSkipEmptying(dir: string) {
   if (!fs.existsSync(dir)) {
     return true
