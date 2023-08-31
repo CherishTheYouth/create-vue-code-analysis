@@ -70,6 +70,8 @@ async function init() {
   console.log()
 
   const cwd = process.cwd() // 当前node.js 进程执行时的工作目录
+
+  // 一些可能的快捷选项，以下的别名，当输入 ts 和 typescript 中的任何一个，会同时生成 ts: true 和 typescript: true 2个配置。
   // possible options:
   // --default
   // --typescript / --ts
@@ -95,6 +97,7 @@ async function init() {
   })
 
   // if any of the feature flags is set, we would skip the feature prompts
+  // 如果使用 --option 选项配置了以下任意一个安装选项，则跳过 prompts 提示。
   const isFeatureFlagsUsed =
     typeof (
       argv.default ??
@@ -109,11 +112,13 @@ async function init() {
       argv.eslint
     ) === 'boolean'
 
-  let targetDir = argv._[0]
+  let targetDir = argv._[0] // 运行 create-vue 指令时，如果跟了项目生成目录名称，则 argv._ 第一个参数则为项目生成目录名称
+  // 配置项目的默认名称，如果指定了项目名称，则默认项目名为设为指定值，否则设为预设的默认值 vue-project
   const defaultProjectName = !targetDir ? 'vue-project' : targetDir
 
-  const forceOverwrite = argv.force
+  const forceOverwrite = argv.force // 运行 create-vue 指令时，如果跟了 --force 配置，则在指定目标目录不为空目录时，强制覆盖
 
+  // 定义一个 result 对象用于保存 prompts 选项结束后得到的用户配置结果。
   let result: {
     projectName?: string
     shouldOverwrite?: boolean
@@ -143,6 +148,7 @@ async function init() {
     // - Add Prettier for code formatting?
     result = await prompts(
       [
+        // 已设置目标目录，则跳过，已目标目录作为项目名，否则展示此选项，如果未填写，则已上面定义的默认项目名为准
         {
           name: 'projectName',
           type: targetDir ? null : 'text',
@@ -150,6 +156,7 @@ async function init() {
           initial: defaultProjectName,
           onState: (state) => (targetDir = String(state.value).trim() || defaultProjectName)
         },
+        // 如果目标目录不是空目录，则询问用户是否覆盖，当用户选择否时，则终止 cli
         {
           name: 'shouldOverwrite',
           type: () => (canSkipEmptying(targetDir) || forceOverwrite ? null : 'confirm'),

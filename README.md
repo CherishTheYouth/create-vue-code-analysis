@@ -977,17 +977,72 @@ function canSkipEmptying(dir: string) {
 
 如果运行 cli 时已输入项目名称，则此提示会跳过。
 
+```ts
+{
+  name: 'shouldOverwrite',
+  type: () => (canSkipEmptying(targetDir) || forceOverwrite ? null : 'confirm'),
+  message: () => {
+      const dirForPrompt =
+            targetDir === '.' ? 'Current directory' : `Target directory "${targetDir}"`
+
+      return `${dirForPrompt} is not empty. Remove existing files and continue?`
+  }
+},
+{
+  name: 'overwriteChecker',
+  type: (prev, values) => {
+    if (values.shouldOverwrite === false) {
+      throw new Error(red('✖') + ' Operation cancelled')
+    }
+    return null
+  }
+},
+```
+
+以上两个 prompts 为一组，在目标文件夹为空时，不需要选择强制覆盖的配置，会跳过这2个 prompts 。
+
+当不为空时，首先会询问是否强制覆盖目标目录，其中 message 字段根据用户输入的 目录名动态生成，这里特别考虑了 ‘.’ 这种目录选择方式（当前目录）。
+
+`type` 即可以是字符串，布尔值，也可以是 Function ，当为 Function 时，拥有2个默认参数 `prev` 和 `values`, `prve` 表示前一个选项的选择的值，`values` 表示已经选择了的所有选项的值。
+
+此处根据上一个选项的选择结果来决定下一个选项的类型。这段代码中，当用户选择不强制覆盖目标目录时，则脚手架执行终止，抛出 `Operation cancelled` 的错误提示。
+
+```tsx
+{
+  name: 'packageName',
+  type: () => (isValidPackageName(targetDir) ? null : 'text'),
+  message: 'Package name:',
+  initial: () => toValidPackageName(targetDir),
+  validate: (dir) => isValidPackageName(dir) || 'Invalid package.json name'
+},  
+...
+// 校验项目名
+function isValidPackageName(projectName) {
+  return /^(?:@[a-z0-9-*~][a-z0-9-*._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/.test(projectName)
+}
+
+// 将不合法的项目名修改为合法的报名
+function toValidPackageName(projectName) {
+  return projectName
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/^[._]/, '')
+    .replace(/[^a-z0-9-~]+/g, '-')
+}
+```
 
 
 
+![截屏2023-08-31 23.16.14](https://cherish-1256678432.cos.ap-nanjing.myqcloud.com/typora/%E6%88%AA%E5%B1%8F2023-08-31%2023.16.14.png)
 
+以上代码，对项目名进行校验，看是否符合内置的规则(这里的一串正则我看不大懂，略过不讲) ，然后对不合法的字符进行校准，生成一个默认的项目名，用户可直接点击确认选择使用这个默认的项目名，或者重新输入一次项目名，如果用户再次输入不合法的项目名，则会出现提示 `Invalid package.json name`, 然后无法继续往下执行，直到用户修改为合法的 项目名。
 
+这里的提示似乎应该是 `Invalid project name`, 功能是对项目名进行校验，却提示 `package.json`  无效，有些奇怪，但也无伤大雅了。个人分析感觉，这里可能是一段从别的地方拷贝过来的代码，哈哈！
 
+![截屏2023-08-31 23.26.36](https://cherish-1256678432.cos.ap-nanjing.myqcloud.com/typora/%E6%88%AA%E5%B1%8F2023-08-31%2023.26.36.png)
 
-
-
-
-
+![截屏2023-08-31 23.29.34](https://cherish-1256678432.cos.ap-nanjing.myqcloud.com/typora/%E6%88%AA%E5%B1%8F2023-08-31%2023.29.34.png)
 
 
 
