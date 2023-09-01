@@ -1307,6 +1307,11 @@ export function postOrderDirectoryTraverse(dir, dirCallback, fileCallback) {
 
 清空目标目录的实现，其核心是通过 `postOrderDirectoryTraverse` 方法来遍历目标文件夹，通过传入自定义的回调方法来决定对 `file` 和 `directory` 执行何种操作。此处对目录执行 `(dir) => fs.rmdirSync(dir)` 方法，来移除目录，对文件执行 `(file) => fs.unlinkSync(file)` 来移除。
 
+```ts
+  const pkg = { name: packageName, version: '0.0.0' }
+  fs.writeFileSync(path.resolve(root, 'package.json'), JSON.stringify(pkg, null, 2))
+```
+
 
 
 
