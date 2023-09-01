@@ -1017,6 +1017,7 @@ function canSkipEmptying(dir: string) {
 },  
 ...
 // 校验项目名
+// 匹配一个项目名称，它可以包含可选的 @scope/ 前缀，后面跟着一个或多个小写字母、数字、-、. 或 ~ 中的任意一个字符。这个正则表达式适用于验证类似于 npm 包名的项目名称格式
 function isValidPackageName(projectName) {
   return /^(?:@[a-z0-9-*~][a-z0-9-*._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/.test(projectName)
 }
@@ -1036,9 +1037,9 @@ function toValidPackageName(projectName) {
 
 ![截屏2023-08-31 23.16.14](https://cherish-1256678432.cos.ap-nanjing.myqcloud.com/typora/%E6%88%AA%E5%B1%8F2023-08-31%2023.16.14.png)
 
-以上代码，对项目名进行校验，看是否符合内置的规则(这里的一串正则我看不大懂，略过不讲) ，然后对不合法的字符进行校准，生成一个默认的项目名，用户可直接点击确认选择使用这个默认的项目名，或者重新输入一次项目名，如果用户再次输入不合法的项目名，则会出现提示 `Invalid package.json name`, 然后无法继续往下执行，直到用户修改为合法的 项目名。
+以上代码，对项目名进行校验，看是否符合内置的规则(类似于npm包名的格式) ，然后对不合法的字符进行校准，生成一个默认的项目名，用户可直接点击确认选择使用这个默认的项目名，或者重新输入一次项目名，如果用户再次输入不合法的项目名，则会出现提示 `Invalid package.json name`, 然后无法继续往下执行，直到用户修改为合法的 项目名。
 
-这里的提示似乎应该是 `Invalid project name`, 功能是对项目名进行校验，却提示 `package.json`  无效，有些奇怪，但也无伤大雅了。个人分析感觉，这里可能是一段从别的地方拷贝过来的代码，哈哈！
+这里的提示似乎应该是 `Invalid project name`, 功能是对项目名进行校验，却提示 `package.json`  无效，有些奇怪，但也无伤大雅了。（*PS：个人分析，这里可能是一段从别的地方拷贝过来的代码，哈哈，等看到后面的源码再看有没有相关内容！*）
 
 ![截屏2023-08-31 23.26.36](https://cherish-1256678432.cos.ap-nanjing.myqcloud.com/typora/%E6%88%AA%E5%B1%8F2023-08-31%2023.26.36.png)
 
@@ -1046,13 +1047,53 @@ function toValidPackageName(projectName) {
 
 
 
+```ts
+{
+    name: 'needsTypeScript',
+    type: () => (isFeatureFlagsUsed ? null : 'toggle'),
+    message: 'Add TypeScript?',
+    initial: false,
+    active: 'Yes',
+    inactive: 'No'
+},
+{
+    name: 'needsJsx',
+    type: () => (isFeatureFlagsUsed ? null : 'toggle'),
+    message: 'Add JSX Support?',
+    initial: false,
+    active: 'Yes',
+    inactive: 'No'
+},
+{
+    name: 'needsRouter',
+    type: () => (isFeatureFlagsUsed ? null : 'toggle'),
+    message: 'Add Vue Router for Single Page Application development?',
+    initial: false,
+    active: 'Yes',
+    inactive: 'No'
+},
+{
+    name: 'needsPinia',
+    type: () => (isFeatureFlagsUsed ? null : 'toggle'),
+    message: 'Add Pinia for state management?',
+    initial: false,
+    active: 'Yes',
+    inactive: 'No'
+},  	
+{	
+    name: 'needsVitest',
+    type: () => (isFeatureFlagsUsed ? null : 'toggle'),
+    message: 'Add Vitest for Unit Testing?',
+    initial: false,
+    active: 'Yes',
+    inactive: 'No'
+},
+          
+```
 
+以上这一组选项都是类似的，都是询问是否添加某模块，初始值为 `false` 默认不添加，`active` 和 `inactive` 分别表示2个不同的选项，`isFeatureFlagsUsed` 前面已经讲过，这里略过。
 
-
-
-
-
-
+所以这一段依次表示询问用户是否需要添加 `TypeScript` 、`JSX Support`、`Vue Router`、`Pinia`、`Vitest` 。
 
 
 
