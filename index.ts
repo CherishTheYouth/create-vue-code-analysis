@@ -276,6 +276,8 @@ async function init() {
     process.exit(1)
   }
 
+  // 此处兼顾用户从 prompts 配置读取配置和直接使用 -- 指令进行快速配置。根据前面的分析，当使用 -- 指令快速配置时，`prompts` 不生效，
+  // 则从 result 中解构出来的属性都为 `undefined`, 此时，则会为其制定默认值，也即是以下代码中从 `argv` 中读取的值。
   // `initial` won't take effect if the prompt type is null
   // so we still have to assign the default values here
   const {

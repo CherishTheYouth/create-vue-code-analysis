@@ -111,69 +111,24 @@ F:\Study\Vue\Code\VueSourceCode\create-vue
 
 每个包的作用是啥？
 
-1. @tsconfig/node18
-
-   > node.js18配套的tsconfig
-
-2. @types/eslint
-
-   > eslint相关
-
-3. @types/node
-
-   > node.js的类型定义
-
-4. @types/prompts
-
-   > prompts 库的类型定义
-
-5. @vue/create-eslint-config
-
-   > 在Vue.js项目中设置ESLint的实用程序。
-
-6. @vue/tsconfig
-
-   > 用于Vue项目的TS Configure扩展。
-
-7. esbuild
-
-   > 这是一个JavaScript打包器和压缩器。
-
-8. esbuild-plugin-license
-
-   > 许可证生成工具
-
-9. husky
-
-   > git 钩子规范工具
-
-10. kolorist
-
-    > 给stdin/stdout的文本内容添加颜色
-
-11. lint-staged
-
-    > 格式化代码
-
-12. minimist
-
-    > 解析参数选项， 应该是当用户从 terminal 中输入命令指令时，帮助解析各个参数的工具
-
-13. npm-run-all
-
-    > 一个CLI工具，用于并行或顺序运行多个npm-script。
-
-14. prettier
-
-    > 代码格式化的
-
-15. prompts
-
-    > 轻巧、美观、人性化的交互式提示。在 terminal 中做对话交互的。
-
-16. zx
-
-    > Bash很棒，但当涉及到编写更复杂的脚本时，许多人更喜欢更方便的编程语言。JavaScript是一个完美的选择，但是Node.js标准库在使用之前需要额外的麻烦。zx包为child_process提供了有用的包装器，转义参数并给出了合理的默认值。
+| 依赖名                    | 功能                                                         |
+| ------------------------- | ------------------------------------------------------------ |
+| @tsconfig/node18          | node.js18配套的tsconfig                                      |
+| @types/eslint             | eslint相关                                                   |
+| @types/node               | node.js的类型定义                                            |
+| @vue/create-eslint-config | 在Vue.js项目中设置ESLint的实用程序。                         |
+| @vue/tsconfig             | 用于Vue项目的TS Configure扩展。                              |
+| esbuild                   | 这是一个JavaScript打包器和压缩器。                           |
+| esbuild-plugin-license    | 许可证生成工具                                               |
+| husky                     | git 钩子规范工具                                             |
+| kolorist                  | 给stdin/stdout的文本内容添加颜色                             |
+| lint-staged               | 格式化代码                                                   |
+| minimist                  | 解析参数选项， 当用户从 terminal 中输入命令指令时，帮助解析各个参数的工具 |
+| npm-run-all               | 一个CLI工具，用于并行或顺序运行多个npm-script。              |
+| prettier                  | 代码格式化的                                                 |
+| prompts                   | 轻巧、美观、人性化的交互式提示。在 terminal 中做对话交互的。 |
+| @types/prompts            | prompts 库的类型定义                                         |
+| zx                        | Bash很棒，但当涉及到编写更复杂的脚本时，许多人更喜欢更方便的编程语言。JavaScript是一个完美的选择，但是Node.js标准库在使用之前需要额外的麻烦。zx包为child_process提供了有用的包装器，转义参数并给出了合理的默认值。 |
 
 可以看到，这16个依赖，真正和cli功能紧密相关的应该是以下几个：
 
@@ -435,7 +390,7 @@ const templateRoot = path.resolve(__dirname, 'template')
 1. 询问你想要啥？；
 2. 你想要啥我就给你啥；
 
-### 1. 实现终端的交互逻辑，读取用户选择
+### 1. 实现终端的交互逻辑，获取用户的选择
 分析代码总是枯燥的，但是既然是读源码，那再枯燥也得坚持。最终我们还得回到代码上，逐行解析。请看
 
 ```ts
@@ -693,113 +648,7 @@ const templateRoot = path.resolve(__dirname, 'template')
           initial: defaultProjectName,
           onState: (state) => (targetDir = String(state.value).trim() || defaultProjectName)
         },
-        {
-          name: 'shouldOverwrite',
-          type: () => (canSkipEmptying(targetDir) || forceOverwrite ? null : 'confirm'),
-          message: () => {
-            const dirForPrompt =
-              targetDir === '.' ? 'Current directory' : `Target directory "${targetDir}"`
-
-            return `${dirForPrompt} is not empty. Remove existing files and continue?`
-          }
-        },
-        {
-          name: 'overwriteChecker',
-          type: (prev, values) => {
-            if (values.shouldOverwrite === false) {
-              throw new Error(red('✖') + ' Operation cancelled')
-            }
-            return null
-          }
-        },
-        {
-          name: 'packageName',
-          type: () => (isValidPackageName(targetDir) ? null : 'text'),
-          message: 'Package name:',
-          initial: () => toValidPackageName(targetDir),
-          validate: (dir) => isValidPackageName(dir) || 'Invalid package.json name'
-        },
-        {
-          name: 'needsTypeScript',
-          type: () => (isFeatureFlagsUsed ? null : 'toggle'),
-          message: 'Add TypeScript?',
-          initial: false,
-          active: 'Yes',
-          inactive: 'No'
-        },
-        {
-          name: 'needsJsx',
-          type: () => (isFeatureFlagsUsed ? null : 'toggle'),
-          message: 'Add JSX Support?',
-          initial: false,
-          active: 'Yes',
-          inactive: 'No'
-        },
-        {
-          name: 'needsRouter',
-          type: () => (isFeatureFlagsUsed ? null : 'toggle'),
-          message: 'Add Vue Router for Single Page Application development?',
-          initial: false,
-          active: 'Yes',
-          inactive: 'No'
-        },
-        {
-          name: 'needsPinia',
-          type: () => (isFeatureFlagsUsed ? null : 'toggle'),
-          message: 'Add Pinia for state management?',
-          initial: false,
-          active: 'Yes',
-          inactive: 'No'
-        },
-        {
-          name: 'needsVitest',
-          type: () => (isFeatureFlagsUsed ? null : 'toggle'),
-          message: 'Add Vitest for Unit Testing?',
-          initial: false,
-          active: 'Yes',
-          inactive: 'No'
-        },
-        {
-          name: 'needsE2eTesting',
-          type: () => (isFeatureFlagsUsed ? null : 'select'),
-          message: 'Add an End-to-End Testing Solution?',
-          initial: 0,
-          choices: (prev, answers) => [
-            { title: 'No', value: false },
-            {
-              title: 'Cypress',
-              description: answers.needsVitest
-                ? undefined
-                : 'also supports unit testing with Cypress Component Testing',
-              value: 'cypress'
-            },
-            {
-              title: 'Playwright',
-              value: 'playwright'
-            }
-          ]
-        },
-        {
-          name: 'needsEslint',
-          type: () => (isFeatureFlagsUsed ? null : 'toggle'),
-          message: 'Add ESLint for code quality?',
-          initial: false,
-          active: 'Yes',
-          inactive: 'No'
-        },
-        {
-          name: 'needsPrettier',
-          type: (prev, values) => {
-            if (isFeatureFlagsUsed || !values.needsEslint) {
-              return null
-            }
-            return 'toggle'
-          },
-          message: 'Add Prettier for code formatting?',
-          initial: false,
-          active: 'Yes',
-          inactive: 'No'
-        }
+        ...
       ],
       {
         onCancel: () => {
@@ -1095,11 +944,368 @@ function toValidPackageName(projectName) {
 
 所以这一段依次表示询问用户是否需要添加 `TypeScript` 、`JSX Support`、`Vue Router`、`Pinia`、`Vitest` 。
 
+接下来是e2e测试选项的 prompts：
+
+```ts
+{
+  name: 'needsE2eTesting',
+  type: () => (isFeatureFlagsUsed ? null : 'select'),
+  message: 'Add an End-to-End Testing Solution?',
+  initial: 0,
+  choices: (prev, answers) => [
+    { title: 'No', value: false },
+    {
+      title: 'Cypress',
+      description: answers.needsVitest
+      ? undefined
+      : 'also supports unit testing with Cypress Component Testing',
+      value: 'cypress'
+    },
+    {
+      title: 'Playwright',
+      value: 'playwright'
+    }
+  ]
+}
+```
+
+这里是一个选择类型的 `prompts`，询问是否添加 `e2e` 测试框架，共 3 个选项：
+
+- 不添加
+- 添加 `cypress`
+- 添加 `playwright`
+
+接下里是 `eslint` 和 `prettier` :
+
+```tsx
+{
+ 	name: 'needsEslint',
+  type: () => (isFeatureFlagsUsed ? null : 'toggle'),
+  message: 'Add ESLint for code quality?',
+  initial: false,
+  active: 'Yes',
+  inactive: 'No'
+},
+{
+  name: 'needsPrettier',
+  type: (prev, values) => {
+    if (isFeatureFlagsUsed || !values.needsEslint) {
+      return null
+    }
+    return 'toggle'
+  },
+  message: 'Add Prettier for code formatting?',
+  initial: false,
+  active: 'Yes',
+  inactive: 'No'
+}
+```
+
+这2个选项为一组，其中如果选择不集成 `eslint`, 则默认也是不集成的 `prettier` 的，只有选择集成`eslint`， 才可继续选择是否集成 `prettier`.
+
+然后是 `prompts` 部分最后一个部分了，异常捕获：
+
+```ts
+try {
+  ...
+} catch (cancelled) {
+  console.log(cancelled.message)
+  process.exit(1)
+}
+```
+
+当在选择过程中按下终止快捷键（ctrl + c）时，或者在选择过程中，触发终止条件时（如上文中某选项的 `throw new Error(red('✖') + ' Operation cancelled')` ），则会进入异常捕获中，此时会打印任务执行终止的提示，并结束此进程。
+
+到此，脚手架第一个部分——用户选择部分全都解析完成了，很好理解，就是使用一些更友好的形式（prompts）来收集用户的需求，使用的工具也很简单易懂。
 
 
 
+接下里看一个 cli 真正的核心功能，根据用户配置生成完整的项目结构。
 
+### 2. 根据用户选择生成合理的项目工程
 
+先贴代码：
+
+```ts
+// `initial` won't take effect if the prompt type is null
+// so we still have to assign the default values here
+  const {
+    projectName,
+    packageName = projectName ?? defaultProjectName,
+    shouldOverwrite = argv.force,
+    needsJsx = argv.jsx,
+    needsTypeScript = argv.typescript,
+    needsRouter = argv.router,
+    needsPinia = argv.pinia,
+    needsVitest = argv.vitest || argv.tests,
+    needsEslint = argv.eslint || argv['eslint-with-prettier'],
+    needsPrettier = argv['eslint-with-prettier']
+  } = result
+
+  const { needsE2eTesting } = result
+  const needsCypress = argv.cypress || argv.tests || needsE2eTesting === 'cypress'
+  const needsCypressCT = needsCypress && !needsVitest
+  const needsPlaywright = argv.playwright || needsE2eTesting === 'playwright'
+
+  const root = path.join(cwd, targetDir)
+
+  if (fs.existsSync(root) && shouldOverwrite) {
+    emptyDir(root)
+  } else if (!fs.existsSync(root)) {
+    fs.mkdirSync(root)
+  }
+
+  console.log(`\nScaffolding project in ${root}...`)
+
+  const pkg = { name: packageName, version: '0.0.0' }
+  fs.writeFileSync(path.resolve(root, 'package.json'), JSON.stringify(pkg, null, 2))
+
+  // todo:
+  // work around the esbuild issue that `import.meta.url` cannot be correctly transpiled
+  // when bundling for node and the format is cjs
+  // const templateRoot = new URL('./template', import.meta.url).pathname
+  const templateRoot = path.resolve(__dirname, 'template')
+  const render = function render(templateName) {
+    const templateDir = path.resolve(templateRoot, templateName)
+    renderTemplate(templateDir, root)
+  }
+  
+  // Add configs.
+  if (needsJsx) {
+    render('config/jsx')
+  }
+  if (needsRouter) {
+    render('config/router')
+  }
+  if (needsPinia) {
+    render('config/pinia')
+  }
+  if (needsVitest) {
+    render('config/vitest')
+  }
+  if (needsCypress) {
+    render('config/cypress')
+  }
+  if (needsCypressCT) {
+    render('config/cypress-ct')
+  }
+  if (needsPlaywright) {
+    render('config/playwright')
+  }
+  if (needsTypeScript) {
+    render('config/typescript')
+
+    // Render tsconfigs
+    render('tsconfig/base')
+    if (needsCypress) {
+      render('tsconfig/cypress')
+    }
+    if (needsCypressCT) {
+      render('tsconfig/cypress-ct')
+    }
+    if (needsPlaywright) {
+      render('tsconfig/playwright')
+    }
+    if (needsVitest) {
+      render('tsconfig/vitest')
+    }
+  }
+
+  // Render ESLint config
+  if (needsEslint) {
+    renderEslint(root, { needsTypeScript, needsCypress, needsCypressCT, needsPrettier })
+  }
+
+  // Render code template.
+  // prettier-ignore
+  const codeTemplate =
+    (needsTypeScript ? 'typescript-' : '') +
+    (needsRouter ? 'router' : 'default')
+  render(`code/${codeTemplate}`)
+
+  // Render entry file (main.js/ts).
+  if (needsPinia && needsRouter) {
+    render('entry/router-and-pinia')
+  } else if (needsPinia) {
+    render('entry/pinia')
+  } else if (needsRouter) {
+    render('entry/router')
+  } else {
+    render('entry/default')
+  }
+
+// Cleanup.
+
+  // We try to share as many files between TypeScript and JavaScript as possible.
+  // If that's not possible, we put `.ts` version alongside the `.js` one in the templates.
+  // So after all the templates are rendered, we need to clean up the redundant files.
+  // (Currently it's only `cypress/plugin/index.ts`, but we might add more in the future.)
+  // (Or, we might completely get rid of the plugins folder as Cypress 10 supports `cypress.config.ts`)
+
+  if (needsTypeScript) {
+    // Convert the JavaScript template to the TypeScript
+    // Check all the remaining `.js` files:
+    //   - If the corresponding TypeScript version already exists, remove the `.js` version.
+    //   - Otherwise, rename the `.js` file to `.ts`
+    // Remove `jsconfig.json`, because we already have tsconfig.json
+    // `jsconfig.json` is not reused, because we use solution-style `tsconfig`s, which are much more complicated.
+    preOrderDirectoryTraverse(
+      root,
+      () => {},
+      (filepath) => {
+        if (filepath.endsWith('.js')) {
+          const tsFilePath = filepath.replace(/\.js$/, '.ts')
+          if (fs.existsSync(tsFilePath)) {
+            fs.unlinkSync(filepath)
+          } else {
+            fs.renameSync(filepath, tsFilePath)
+          }
+        } else if (path.basename(filepath) === 'jsconfig.json') {
+          fs.unlinkSync(filepath)
+        }
+      }
+    )
+
+    // Rename entry in `index.html`
+    const indexHtmlPath = path.resolve(root, 'index.html')
+    const indexHtmlContent = fs.readFileSync(indexHtmlPath, 'utf8')
+    fs.writeFileSync(indexHtmlPath, indexHtmlContent.replace('src/main.js', 'src/main.ts'))
+  } else {
+    // Remove all the remaining `.ts` files
+    preOrderDirectoryTraverse(
+      root,
+      () => {},
+      (filepath) => {
+        if (filepath.endsWith('.ts')) {
+          fs.unlinkSync(filepath)
+        }
+      }
+    )
+  }
+
+  // Instructions:
+  // Supported package managers: pnpm > yarn > npm
+  const userAgent = process.env.npm_config_user_agent ?? ''
+  const packageManager = /pnpm/.test(userAgent) ? 'pnpm' : /yarn/.test(userAgent) ? 'yarn' : 'npm'
+
+  // README generation
+  fs.writeFileSync(
+    path.resolve(root, 'README.md'),
+    generateReadme({
+      projectName: result.projectName ?? result.packageName ?? defaultProjectName,
+      packageManager,
+      needsTypeScript,
+      needsVitest,
+      needsCypress,
+      needsPlaywright,
+      needsCypressCT,
+      needsEslint
+    })
+  )
+
+  console.log(`\nDone. Now run:\n`)
+  if (root !== cwd) {
+    const cdProjectName = path.relative(cwd, root)
+    console.log(
+      `  ${bold(green(`cd ${cdProjectName.includes(' ') ? `"${cdProjectName}"` : cdProjectName}`))}`
+    )
+  }
+  console.log(`  ${bold(green(getCommand(packageManager, 'install')))}`)
+  if (needsPrettier) {
+    console.log(`  ${bold(green(getCommand(packageManager, 'format')))}`)
+  }
+  console.log(`  ${bold(green(getCommand(packageManager, 'dev')))}`)
+  console.log()
+```
+
+第一部分是解析出用户的安装配置项：
+
+```ts
+// `initial` won't take effect if the prompt type is null
+// so we still have to assign the default values here
+// 此处兼顾用户从 prompts 配置读取配置和直接使用 -- 指令进行快速配置。根据前面的分析，当使用 -- 指令快速配置时，`prompts` 不生效，则从 result 中解构出来的属性都为 `undefined`, 此时，则会为其制定默认值，也即是以下代码中从 `argv` 中读取的值。
+const {
+  projectName,
+  packageName = projectName ?? defaultProjectName,
+  shouldOverwrite = argv.force,
+  needsJsx = argv.jsx,
+  needsTypeScript = argv.typescript,
+  needsRouter = argv.router,
+  needsPinia = argv.pinia,
+  needsVitest = argv.vitest || argv.tests,
+  needsEslint = argv.eslint || argv['eslint-with-prettier'],
+  needsPrettier = argv['eslint-with-prettier']
+} = result
+
+const { needsE2eTesting } = result
+const needsCypress = argv.cypress || argv.tests || needsE2eTesting === 'cypress'
+const needsCypressCT = needsCypress && !needsVitest
+const needsPlaywright = argv.playwright || needsE2eTesting === 'playwright'
+```
+
+此处兼顾用户从 prompts 配置读取配置和直接使用 -- 指令进行快速配置。根据前面的分析，当使用 -- 指令快速配置时，`prompts` 不生效，则从 result 中解构出来的属性都为 `undefined`, 此时，则会为其制定默认值，也即是以下代码中从 `argv` 中读取的值。
+
+紧接着开始进入文件操作阶段了。
+
+```ts
+const root = path.join(cwd, targetDir) // 计算目标文件夹的完整文件路径
+
+// 读取目标文件夹状态，看该文件夹是否是一个已存在文件夹，是否需要覆盖
+// 文件夹存在，则清空，文件夹不存在，则创建
+if (fs.existsSync(root) && shouldOverwrite) {
+  emptyDir(root)
+} else if (!fs.existsSync(root)) {
+  fs.mkdirSync(root)
+}
+// 一句提示, 脚手架项目在xxx目录
+console.log(`\nScaffolding project in ${root}...`)
+
+// emptyDir
+function emptyDir(dir) {
+  // 代码写的很严谨、健壮，即使外层调用的地方已经判断了目录是否存在，在实际操作目录中依然会重新判断一下，与外部的业务代码不产生多余的依赖关系。
+  if (!fs.existsSync(dir)) {
+    return
+  }
+
+  // 遍历目录，清空目录里的文件夹和文件
+  postOrderDirectoryTraverse(
+    dir,
+    (dir) => fs.rmdirSync(dir),
+    (file) => fs.unlinkSync(file)
+  )
+}
+
+// postOrderDirectoryTraverse  from './utils/directoryTraverse'
+// /utils/directoryTraverse.ts
+// 这个方法递归的遍历给定文件夹，并对内部的 文件夹 和 文件 按照给定的回调函数进行操作。
+export function postOrderDirectoryTraverse(dir, dirCallback, fileCallback) {
+  // 遍历dir下的文件
+  for (const filename of fs.readdirSync(dir)) {
+    // 如果文件是 .git 文件，则跳过
+    if (filename === '.git') {
+      continue
+    }
+    const fullpath = path.resolve(dir, filename) // 计算文件路径
+    // 如果该文件是一个文件夹类型，则递归调用此方法，继续对其内部的文件进行操作
+    if (fs.lstatSync(fullpath).isDirectory()) {
+      postOrderDirectoryTraverse(fullpath, dirCallback, fileCallback)
+      // 当然递归完后，不要忘记对该文件夹自己进行操作
+      dirCallback(fullpath)
+      continue
+    }
+    // 如果该文件不是文件夹类型，是纯文件，则直接执行对单个文件的回调操作
+    fileCallback(fullpath)
+  }
+}
+```
+
+以上部分主要是判断目标目录的状态，清空目标目录的实现过程。
+
+> fs.unlinkSync: 同步删除文件；
+>
+> fs.rmdirSync: 同步删除给定路径下的目录;
+
+清空目标目录的实现，其核心是通过 `postOrderDirectoryTraverse` 方法来遍历目标文件夹，通过传入自定义的回调方法来决定对 `file` 和 `directory` 执行何种操作。此处对目录执行 `(dir) => fs.rmdirSync(dir)` 方法，来移除目录，对文件执行 `(file) => fs.unlinkSync(file)` 来移除。
 
 
 
