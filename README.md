@@ -1485,9 +1485,86 @@ function sortDependencies(packageJson) {
 }
 ```
 
+> 以上代码已添加了详尽的注释，学习时也可略过相关正文描述
 
+`renderTemplate` 方法主要作用是将模板里的内容按需渲染到脚手架工程中。主要涉及到一些文件的拷贝，合并，调增等操作。以上代码已添加详细注释，这里将其中特殊处理的几个点罗列如下，阅读时着重注意即可：
 
+- 渲染模板时，如果模板中存在 'node_modules' 文件夹需跳过；
+- package.json 需要与脚手架工程中的package.json做合并操作, 并对内部的属性的位置做了排序；（按照 dependencies , devDependencies , peerDependencies, optionalDependencies 的顺序）
+- extensions.json 需要与脚手架工程中的对应文件做合并操作；
+- 以 _ 开头的文件名转化为 . 开头的文件名；（如_a.ts => .a.ts）;
+- _gitignore 文件，需要将其中的配置追加到目标目录对应文件中；
 
+接下来回到 `index.ts` 文件中继续分析主流程：
+
+```ts
+// Render base template
+render('base')
+
+// Add configs.
+if (needsJsx) {
+    render('config/jsx')
+}
+if (needsRouter) {
+    render('config/router')
+}
+if (needsPinia) {
+    render('config/pinia')
+}
+if (needsVitest) {
+    render('config/vitest')
+}
+if (needsCypress) {
+    render('config/cypress')
+}
+if (needsCypressCT) {
+    render('config/cypress-ct')
+}
+if (needsPlaywright) {
+    render('config/playwright')
+}
+if (needsTypeScript) {
+    render('config/typescript')
+
+    // Render tsconfigs
+    render('tsconfig/base')
+    if (needsCypress) {
+        render('tsconfig/cypress')
+    }
+    if (needsCypressCT) {
+        render('tsconfig/cypress-ct')
+    }
+    if (needsPlaywright) {
+        render('tsconfig/playwright')
+    }
+    if (needsVitest) {
+        render('tsconfig/vitest')
+    }
+}
+
+// Render ESLint config
+if (needsEslint) {
+    renderEslint(root, { needsTypeScript, needsCypress, needsCypressCT, needsPrettier })
+}
+
+// Render code template.
+// prettier-ignore
+const codeTemplate =
+      (needsTypeScript ? 'typescript-' : '') +
+      (needsRouter ? 'router' : 'default')
+render(`code/${codeTemplate}`)
+
+// Render entry file (main.js/ts).
+if (needsPinia && needsRouter) {
+    render('entry/router-and-pinia')
+} else if (needsPinia) {
+    render('entry/pinia')
+} else if (needsRouter) {
+    render('entry/router')
+} else {
+    render('entry/default')
+}
+```
 
 
 
