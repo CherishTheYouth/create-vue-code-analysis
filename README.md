@@ -1262,7 +1262,7 @@ console.log(`\nScaffolding project in ${root}...`)
 
 // emptyDir
 function emptyDir(dir) {
-  // 代码写的很严谨、健壮，即使外层调用的地方已经判断了目录是否存在，在实际操作目录中依然会重新判断一下，与外部的业务代码不产生多余的依赖关系。
+// 代码写的很严谨、健壮，即使外层调用的地方已经判断了目录是否存在，在实际操作目录中依然会重新判断一下，与外部的业务代码不产生多余的依赖关系。
   if (!fs.existsSync(dir)) {
     return
   }
@@ -1308,13 +1308,184 @@ export function postOrderDirectoryTraverse(dir, dirCallback, fileCallback) {
 清空目标目录的实现，其核心是通过 `postOrderDirectoryTraverse` 方法来遍历目标文件夹，通过传入自定义的回调方法来决定对 `file` 和 `directory` 执行何种操作。此处对目录执行 `(dir) => fs.rmdirSync(dir)` 方法，来移除目录，对文件执行 `(file) => fs.unlinkSync(file)` 来移除。
 
 ```ts
-  const pkg = { name: packageName, version: '0.0.0' }
-  fs.writeFileSync(path.resolve(root, 'package.json'), JSON.stringify(pkg, null, 2))
+// 定义脚手架工程的 package.json 文件的内容，这里 packageName 和 projectName是保持一致的。
+const pkg = { name: packageName, version: '0.0.0' }
+// 创建一个 package.json 文件，写入 pkg 变量定义的内容
+fs.writeFileSync(path.resolve(root, 'package.json'), JSON.stringify(pkg, null, 2))
 ```
 
+> fs.writeFileSync(file, data[, option])
+>
+> - file: 它是一个字符串，Buffer，URL或文件描述整数，表示必须在其中写入文件的路径。使用文件描述符将使其行为类似于fs.write()方法。
+> - data: 它是将写入文件的字符串，Buffer，TypedArray或DataView。
+> - options: 它是一个字符串或对象，可用于指定将影响输出的可选参数。它具有三个可选参数：
+>   - **encoding:**它是一个字符串，它指定文件的编码。默认值为“ utf8”。
+>   - **mode:**它是一个整数，指定文件模式。默认值为0o666。
+>   - **flag:**它是一个字符串，指定在写入文件时使用的标志。默认值为“ w”。
+>
+> JSON.stringify(value[, replacer [, space]])
+>
+> - value: 将要序列化成 一个 JSON 字符串的值。
+>
+> - replacer: 可选, 如果该参数是一个函数，则在序列化过程中，被序列化的值的每个属性都会经过该函数的转换和处理；如果该参数是一个数组，则只有包含在这个数组中的属性名才会被序列化到最终的 JSON 字符串中；如果该参数为 null 或者未提供，则对象所有的属性都会被序列化。
+>
+> - space: 可选, 指定缩进用的空白字符串，用于美化输出（pretty-print）；如果参数是个数字，它代表有多少的空格；上限为 10。该值若小于 1，则意味着没有空格；如果该参数为字符串（当字符串长度超过 10 个字母，取其前 10 个字母），该字符串将被作为空格；如果该参数没有提供（或者为 null），将没有空格。
 
+接下来正式进入模板渲染环节了。
 
+> __dirname 可以用来动态获取当前文件所属目录的绝对路径;
+>
+> __filename 可以用来动态获取当前文件的绝对路径，包含当前文件 ;
+>
+> path.resolve() 方法是以程序为根目录，作为起点，根据参数解析出一个绝对路径；
 
+```ts
+// 计算模板所在文件加路径
+const templateRoot = path.resolve(__dirname, 'template')
+// 定义模板渲染 render 方法，参数为模板名
+const render = function render(templateName) {
+    const templateDir = path.resolve(templateRoot, templateName)
+    // 核心是这个 renderTemplate 方法，第一个参数是源文件夹目录，第二个参数是目标文件夹目录
+    renderTemplate(templateDir, root)
+}
+```
+
+以上代码定义了一个模板渲染方法，根据模板名，生成不同的项目模块。
+
+其核心为 `renderTemplate` 方法，下面来看此方法的代码实现：
+```ts
+// /utils/renderTemplate.ts
+
+/**
+ * Renders a template folder/file to the file system,
+ * by recursively copying all files under the `src` directory,
+ * with the following exception:
+ *   - `_filename` should be renamed to `.filename`
+ *   - Fields in `package.json` should be recursively merged
+ * @param {string} src source filename to copy
+ * @param {string} dest destination filename of the copy operation
+ */
+/** 翻译一下这段函数说明：
+ * 通过递归复制 src 目录下的所有文件，将模板文件夹/文件 复制到 目标文件夹，
+ * 但以下情况例外：
+ * 1. '_filename' 会被重命名为 '.filename';
+ * 2. package.json 文件中的字段会被递归合并；
+ */
+function renderTemplate(src, dest) {
+  const stats = fs.statSync(src) // src 目录的文件状态
+
+  // 如果当前src是文件夹，则在目标目录中递归的生成此目录的子目录和子文件，但 node_modules 忽略
+  if (stats.isDirectory()) {
+    // skip node_module
+    if (path.basename(src) === 'node_modules') {
+      return
+    }
+
+    // if it's a directory, render its subdirectories and files recursively
+    fs.mkdirSync(dest, { recursive: true })
+    for (const file of fs.readdirSync(src)) {
+      renderTemplate(path.resolve(src, file), path.resolve(dest, file))
+    }
+    return
+  }
+
+  // path.basename(path[, ext]) 返回 path 的最后一部分，也即是文件名了。
+  const filename = path.basename(src)
+
+  // 如果当前src是单个文件，则直接复制到目标路径下，但有以下几类文件例外，要特殊处理。
+  // package.json 做合并操作；
+  // extensions.json 做合并操作；
+  // 以 _ 开头的文件名转化为 . 开头的文件名；
+  // _gitignore 文件，将其中的配置追加到目标目录对应文件中；
+  if (filename === 'package.json' && fs.existsSync(dest)) {
+    // merge instead of overwriting
+    const existing = JSON.parse(fs.readFileSync(dest, 'utf8'))
+    const newPackage = JSON.parse(fs.readFileSync(src, 'utf8'))
+    const pkg = sortDependencies(deepMerge(existing, newPackage))
+    fs.writeFileSync(dest, JSON.stringify(pkg, null, 2) + '\n')
+    return
+  }
+
+  if (filename === 'extensions.json' && fs.existsSync(dest)) {
+    // merge instead of overwriting
+    const existing = JSON.parse(fs.readFileSync(dest, 'utf8'))
+    const newExtensions = JSON.parse(fs.readFileSync(src, 'utf8'))
+    const extensions = deepMerge(existing, newExtensions)
+    fs.writeFileSync(dest, JSON.stringify(extensions, null, 2) + '\n')
+    return
+  }
+
+  if (filename.startsWith('_')) {
+    // rename `_file` to `.file`
+    dest = path.resolve(path.dirname(dest), filename.replace(/^_/, '.'))
+  }
+
+  if (filename === '_gitignore' && fs.existsSync(dest)) {
+    // append to existing .gitignore
+    const existing = fs.readFileSync(dest, 'utf8')
+    const newGitignore = fs.readFileSync(src, 'utf8')
+    fs.writeFileSync(dest, existing + '\n' + newGitignore)
+    return
+  }
+
+  fs.copyFileSync(src, dest)
+}
+
+// /utils/deepMerge.ts
+const isObject = (val) => val && typeof val === 'object'
+// 合并数组时，利用Set数据类型 对数组进行去重
+const mergeArrayWithDedupe = (a, b) => Array.from(new Set([...a, ...b]))
+
+/**
+ * Recursively merge the content of the new object to the existing one
+ * 递归的将两个对象进行合并
+ * @param {Object} target the existing object
+ * @param {Object} obj the new object
+ */
+function deepMerge(target, obj) {
+  for (const key of Object.keys(obj)) {
+    const oldVal = target[key]
+    const newVal = obj[key]
+
+    if (Array.isArray(oldVal) && Array.isArray(newVal)) {
+      target[key] = mergeArrayWithDedupe(oldVal, newVal)
+    } else if (isObject(oldVal) && isObject(newVal)) {
+      target[key] = deepMerge(oldVal, newVal)
+    } else {
+      target[key] = newVal
+    }
+  }
+
+  return target
+}
+
+// /utils/sortDependencies
+// 将四种类型的依赖进行一个排序，共4种类型：dependencies、devDependencies、peerDependencies、optionalDependencies
+// 这一步没有很大的必要，不要也不影响功能，主要是为了将以上四个类型属性在package.json中的位置统一一下，按照dependencies、devDependencies、peerDependencies、optionalDependencies 这个顺序以此展示这些依赖项。
+function sortDependencies(packageJson) {
+  const sorted = {}
+
+  const depTypes = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']
+
+  for (const depType of depTypes) {
+    if (packageJson[depType]) {
+      sorted[depType] = {}
+
+      Object.keys(packageJson[depType])
+        .sort()
+        .forEach((name) => {
+          sorted[depType][name] = packageJson[depType][name]
+        })
+    }
+  }
+
+  return {
+    ...packageJson,
+    ...sorted
+  }
+}
+
+```
 
 
 
