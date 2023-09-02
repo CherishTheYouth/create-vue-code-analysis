@@ -1499,6 +1499,7 @@ function sortDependencies(packageJson) {
 
 ```ts
 // Render base template
+// 渲染一个最基础的基于 vite 的 vue3 项目 
 render('base')
 
 // Add configs.
@@ -1568,3 +1569,242 @@ if (needsPinia && needsRouter) {
 
 
 
+```ts
+  // Render base template
+  render('base')
+```
+
+首先渲染一个最基础的基于 `vite` 的 `vue3` 项目，除了 `renderTemplate` 方法中的一些特殊点之外， `render('base')` 中需要注意的一点是，这并不是一个完善的能跑的 vue3 工程，这里面缺少了 `main.js` 文件，这个文件会在后面的 `Render entry file ` 部分进行补充。
+
+![截屏2023-09-02 21.43.24](https://cherish-1256678432.cos.ap-nanjing.myqcloud.com/typora/%E6%88%AA%E5%B1%8F2023-09-02%2021.43.24.png)
+
+ 如图所示，无 `main.j(t)s` 文件.
+
+紧接着是渲染用户选择的一些配置：
+
+- Jsx 配置：包括 `package.json` 需要安装的依赖 和 `vite.config.js` 中的 相关配置：
+
+```ts
+// Add configs.
+if (needsJsx) {
+  render('config/jsx')
+}
+```
+
+```ts
+// package.json
+{
+  "dependencies": {
+    "vue": "^3.3.2"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue-jsx": "^3.0.1", // 主要是这个 plugin-vue-jsx 插件
+    "vite": "^4.3.5"
+  }
+}
+// vite.config.js
+import { fileURLToPath, URL } from 'node:url'
+
+import { defineConfig } from 'vite'
+import vue from '@vitejs/plugin-vue'
+import vueJsx from '@vitejs/plugin-vue-jsx'
+
+// https://vitejs.dev/config/
+export default defineConfig({
+  plugins: [vue(), vueJsx()],// 主要是这里
+  resolve: {
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url))
+    }
+  }
+})
+```
+
+- router 配置：就一个`package.json` 中需要安装的依赖
+
+```ts
+if (needsRouter) {
+  render('config/router')
+}
+```
+
+```json
+// package.json
+{
+  "dependencies": {
+    "vue": "^3.3.2",
+    "vue-router": "^4.2.0" // 这个
+  }
+}
+```
+
+- pinia 配置：1. package.json 配置；2. 新增一个 `pinia` 使用 `demo`.
+
+```ts
+if (needsPinia) {
+  render('config/pinia')
+}
+```
+
+```ts
+{
+  "dependencies": {
+    "pinia": "^2.0.36",
+    "vue": "^3.3.2"
+  }
+}
+```
+
+![image-20230902215623065](https://cherish-1256678432.cos.ap-nanjing.myqcloud.com/typora/image-20230902215623065.png)
+
+- Vitest 配置： 1. package.json 配置；2. vitest.config.js 文件；3. 一个单测用例示例；
+
+```ts
+if (needsVitest) {
+  render('config/vitest')
+}
+```
+
+> 具体内容可看源码的模板文件
+
+- Cypress/cypress-ct/playwright: 与上面操作类似，不赘述，直接看源码的模板文件；
+
+```ts
+if (needsCypress) {
+  render('config/cypress')
+}
+if (needsCypressCT) {
+  render('config/cypress-ct')
+}
+if (needsPlaywright) {
+  render('config/playwright')
+}
+```
+
+- TypeScript 配置：
+
+```ts
+if (needsTypeScript) {
+  render('config/typescript')
+  // Render tsconfigs
+  render('tsconfig/base')
+  if (needsCypress) {
+    render('tsconfig/cypress')
+  }
+  if (needsCypressCT) {
+    render('tsconfig/cypress-ct')
+  }
+  if (needsPlaywright) {
+    render('tsconfig/playwright')
+  }
+  if (needsVitest) {
+    render('tsconfig/vitest')
+  }
+}
+```
+
+`TypeScript` 的配置相对复杂一些，但根本上来说都是一些预先配置好的内容，只要按需从对应模版取正确的配置进行渲染，保证 `TypeScript` 的正常功能即可，亦不赘述。
+
+- Eslint 配置
+
+接下是 `eslint` 相关配置的渲染，这块是一个单独的渲染函数，跟 `TypeScript`, `Cypress`, `CypressCT` , `Prettier` 这几个模块相关。主要是一些针对行的处理逻辑，核心思路还是一样，通过文件、配置的组合处理，来生成一个完整的功能配置。
+
+```ts
+// Render ESLint config
+if (needsEslint) {
+  renderEslint(root, { needsTypeScript, needsCypress, needsCypressCT, needsPrettier })
+}
+
+```
+
+- 模板配置
+
+```ts
+// Render code template.
+// prettier-ignore
+const codeTemplate =
+      (needsTypeScript ? 'typescript-' : '') +
+      (needsRouter ? 'router' : 'default')
+render(`code/${codeTemplate}`)
+
+// Render entry file (main.js/ts).
+if (needsPinia && needsRouter) {
+  render('entry/router-and-pinia')
+} else if (needsPinia) {
+  render('entry/pinia')
+} else if (needsRouter) {
+  render('entry/router')
+} else {
+  render('entry/default')
+}
+```
+
+- main.j(t)s配置
+
+```ts
+// Render entry file (main.js/ts).
+if (needsPinia && needsRouter) {
+  render('entry/router-and-pinia')
+} else if (needsPinia) {
+  render('entry/pinia')
+} else if (needsRouter) {
+  render('entry/router')
+} else {
+  render('entry/default')
+}
+```
+
+前面提到 base 目录中缺少 main.j(t)s 文件，这里给补上了。
+
+- ts 和 js 的差异化处理
+
+```ts
+// We try to share as many files between TypeScript and JavaScript as possible.
+  // If that's not possible, we put `.ts` version alongside the `.js` one in the templates.
+  // So after all the templates are rendered, we need to clean up the redundant files.
+  // (Currently it's only `cypress/plugin/index.ts`, but we might add more in the future.)
+  // (Or, we might completely get rid of the plugins folder as Cypress 10 supports `cypress.config.ts`)
+// 翻译一下：我们尝试在 TypeScript 和 JavaScript 之间共享尽可能多的文件。如果无法实现这一点，我们将“.ts”版本“.js”版本旁边放在一起。因此，在所有模板渲染完毕后，我们需要清理冗余文件。（目前只有'cypress/plugin/index.ts'是这种情况，但我们将来可能会添加更多。（或者，我们可能会完全摆脱插件文件夹，因为 Cypress 10 支持 'cypress.config.ts）
+  if (needsTypeScript) {
+    // Convert the JavaScript template to the TypeScript
+    // Check all the remaining `.js` files:
+    //   - If the corresponding TypeScript version already exists, remove the `.js` version.
+    //   - Otherwise, rename the `.js` file to `.ts`
+    // Remove `jsconfig.json`, because we already have tsconfig.json
+    // `jsconfig.json` is not reused, because we use solution-style `tsconfig`s, which are much more complicated.
+    preOrderDirectoryTraverse(
+      root,
+      () => {},
+      (filepath) => {
+        if (filepath.endsWith('.js')) {
+          const tsFilePath = filepath.replace(/\.js$/, '.ts')
+          if (fs.existsSync(tsFilePath)) {
+            fs.unlinkSync(filepath)
+          } else {
+            fs.renameSync(filepath, tsFilePath)
+          }
+        } else if (path.basename(filepath) === 'jsconfig.json') {
+          fs.unlinkSync(filepath)
+        }
+      }
+    )
+
+    // Rename entry in `index.html`
+    const indexHtmlPath = path.resolve(root, 'index.html')
+    const indexHtmlContent = fs.readFileSync(indexHtmlPath, 'utf8')
+    fs.writeFileSync(indexHtmlPath, indexHtmlContent.replace('src/main.js', 'src/main.ts'))
+  } else {
+    // Remove all the remaining `.ts` files
+    preOrderDirectoryTraverse(
+      root,
+      () => {},
+      (filepath) => {
+        if (filepath.endsWith('.ts')) {
+          fs.unlinkSync(filepath)
+        }
+      }
+    )
+  }
+```
+
+ 

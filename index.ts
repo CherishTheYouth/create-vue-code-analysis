@@ -394,6 +394,13 @@ async function init() {
   // So after all the templates are rendered, we need to clean up the redundant files.
   // (Currently it's only `cypress/plugin/index.ts`, but we might add more in the future.)
   // (Or, we might completely get rid of the plugins folder as Cypress 10 supports `cypress.config.ts`)
+  /**
+   * 翻译一下：我们尝试在 TypeScript 和 JavaScript 之间共享尽可能多的文件。
+   * 如果无法实现这一点，我们将“.ts”版本“.js”版本旁边放在一起。
+   * 因此，在所有模板渲染完毕后，我们需要清理冗余文件。
+   * 目前只有'cypress/plugin/index.ts'是这种情况，但我们将来可能会添加更多。
+   * 或者，我们可能会完全摆脱插件文件夹，因为 Cypress 10 支持 'cypress.config.ts
+  */
 
   if (needsTypeScript) {
     // Convert the JavaScript template to the TypeScript
