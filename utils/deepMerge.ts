@@ -1,8 +1,10 @@
 const isObject = (val) => val && typeof val === 'object'
+// 合并数组时，利用Set数据类型 对数组进行去重
 const mergeArrayWithDedupe = (a, b) => Array.from(new Set([...a, ...b]))
 
 /**
  * Recursively merge the content of the new object to the existing one
+ * 递归的将两个对象进行合并
  * @param {Object} target the existing object
  * @param {Object} obj the new object
  */

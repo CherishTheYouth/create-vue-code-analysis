@@ -13,9 +13,17 @@ import sortDependencies from './sortDependencies'
  * @param {string} src source filename to copy
  * @param {string} dest destination filename of the copy operation
  */
+/** 翻译一下这段函数说明：
+ * 通过递归复制 src 目录下的所有文件，将模板文件夹/文件 复制到 目标文件夹，
+ * 但以下情况例外：
+ * 1. '_filename' 会被重命名为 '.filename';
+ * 2. package.json 文件中的字段会被递归合并；
+ */
 function renderTemplate(src, dest) {
+  // src 目录的文件状态
   const stats = fs.statSync(src)
 
+  // 如果当前src是文件夹，则在目标目录中递归的生成此目录的子目录和子文件，但 node_modules 忽略
   if (stats.isDirectory()) {
     // skip node_module
     if (path.basename(src) === 'node_modules') {
@@ -30,8 +38,16 @@ function renderTemplate(src, dest) {
     return
   }
 
+  // path.basename(path[, ext]) 返回 path 的最后一部分，也即是文件名了。
   const filename = path.basename(src)
 
+  /**
+   * 如果当前src是单个文件，则直接复制到目标路径下，但有以下几类文件例外，要特殊处理。
+   * package.json 做合并操作, 并对内部的属性的位置做了排序；
+   * extensions.json 做合并操作；
+   * 以 _ 开头的文件名转化为 . 开头的文件名；
+   * _gitignore 文件，将其中的配置追加到目标目录对应文件中；
+  */
   if (filename === 'package.json' && fs.existsSync(dest)) {
     // merge instead of overwriting
     const existing = JSON.parse(fs.readFileSync(dest, 'utf8'))

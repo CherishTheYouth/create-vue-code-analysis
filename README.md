@@ -1355,7 +1355,6 @@ const render = function render(templateName) {
 其核心为 `renderTemplate` 方法，下面来看此方法的代码实现：
 ```ts
 // /utils/renderTemplate.ts
-
 /**
  * Renders a template folder/file to the file system,
  * by recursively copying all files under the `src` directory,
@@ -1393,7 +1392,7 @@ function renderTemplate(src, dest) {
   const filename = path.basename(src)
 
   // 如果当前src是单个文件，则直接复制到目标路径下，但有以下几类文件例外，要特殊处理。
-  // package.json 做合并操作；
+  // package.json 做合并操作，并对内部的属性的位置做了排序；
   // extensions.json 做合并操作；
   // 以 _ 开头的文件名转化为 . 开头的文件名；
   // _gitignore 文件，将其中的配置追加到目标目录对应文件中；
@@ -1484,7 +1483,6 @@ function sortDependencies(packageJson) {
     ...sorted
   }
 }
-
 ```
 
 
