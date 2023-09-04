@@ -1986,3 +1986,149 @@ ${commandFor('lint')}
 
 生成 readme.md 的操作，主要是一些文本字符串的拼接操作，根据使用者的包管理工具的不同，生成不同的 readme.md 文档。经过前面的分析，再看这块，就觉得很简单了。
 
+- 打印新项目运行提示
+
+最后一部分是新项目运行提示，也就是当你的脚手架工程生成完毕后，告知你应该如何启动和运行你的脚手架工程。
+
+```ts
+console.log(`\nDone. Now run:\n`) // 打印提示
+// 如果工程所在目录与当前目录不是同一个目录，则打印 cd xxx 指令
+if (root !== cwd) {
+  const cdProjectName = path.relative(cwd, root)
+  console.log(
+    `  ${bold(green(`cd ${cdProjectName.includes(' ') ? `"${cdProjectName}"` : cdProjectName}`))}`
+  )
+}
+// 根据包管理工具的不同，输出不同的安装以来指令
+console.log(`  ${bold(green(getCommand(packageManager, 'install')))}`)
+// 如果集成了 prettier, 输出格式化指令
+if (needsPrettier) {
+  console.log(`  ${bold(green(getCommand(packageManager, 'format')))}`)
+}
+// 根据包管理工具的不同，输出启动脚手架工程的指令
+console.log(`  ${bold(green(getCommand(packageManager, 'dev')))}`)
+console.log()
+// 结束
+```
+
+也就是如下图所示的脚手架工程运行指引。
+
+![image-20230904222751185](https://cherish-1256678432.cos.ap-nanjing.myqcloud.com/typora/image-20230904222751185.png)
+
+当项目名称带有空格时，需要带引号输出。
+
+![image-20230904224601508](https://cherish-1256678432.cos.ap-nanjing.myqcloud.com/typora/image-20230904224601508.png)
+
+到这里，关于 `create-vue` 的全部核心流程就都分析完毕了。
+
+接下来看最后一个部分，项目的打包。
+
+## croate-vue 是如何打包的？
+
+一个工程化的项目，为了程序的可维护性等方面的需求，总是需要将不同功能的文件按照其职能进行分类管理，但是在实际使用过程中，不可能基于原始工程去直接使用，需要通过打包工具将项目打包为一个庞大的单文件。`create-vue` 打包指令如下：
+
+```ts
+"scripts": {
+    "build": "zx ./scripts/build.mjs",
+  },
+```
+
+该指令执行了 `./scripts/build.mjs` 文件，接下来结合代码来分析一下打包过程。
+
+`zx` 是一个执行脚本的工具，这在文初有简单介绍，此处先不展开分析。直接看 `build.mjs`
+
+```js
+import * as esbuild from 'esbuild'
+import esbuildPluginLicense from 'esbuild-plugin-license'
+
+const CORE_LICENSE = `MIT License
+
+Copyright (c) 2021-present vuejs
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+`
+
+await esbuild.build({
+  bundle: true, // 是否打包
+  entryPoints: ['index.ts'], // 入口
+  outfile: 'outfile.cjs', // 出口
+  format: 'cjs', // 输出格式 commonJS
+  platform: 'node', // 平台
+  target: 'node14',
+
+  plugins: [
+    {
+      name: 'alias',
+      setup({ onResolve, resolve }) {
+        onResolve({ filter: /^prompts$/, namespace: 'file' }, async ({ importer, resolveDir }) => {
+          // we can always use non-transpiled code since we support 14.16.0+
+          const result = await resolve('prompts/lib/index.js', {
+            importer,
+            resolveDir,
+            kind: 'import-statement'
+          })
+          return result
+        })
+      }
+    },
+    esbuildPluginLicense({
+      thirdParty: {
+        includePrivate: false,
+        output: {
+          file: 'LICENSE',
+          template(allDependencies) {
+            // There's a bug in the plugin that it also includes the `create-vue` package itself
+            const dependencies = allDependencies.filter((d) => d.packageJson.name !== 'create-vue')
+            const licenseText =
+              `# create-vue core license\n\n` +
+              `create-vue is released under the MIT license:\n\n` +
+              CORE_LICENSE +
+              `\n## Licenses of bundled dependencies\n\n` +
+              `The published create-vue artifact additionally contains code with the following licenses:\n` +
+              [...new Set(dependencies.map((dependency) => dependency.packageJson.license))].join(
+                ', '
+              ) +
+              '\n\n' +
+              `## Bundled dependencies\n\n` +
+              dependencies
+                .map((dependency) => {
+                  return (
+                    `## ${dependency.packageJson.name}\n\n` +
+                    `License: ${dependency.packageJson.license}\n` +
+                    `By: ${dependency.packageJson.author.name}\n` +
+                    `Repository: ${dependency.packageJson.repository.url}\n\n` +
+                    dependency.licenseText
+                      .split('\n')
+                      .map((line) => (line ? `> ${line}` : '>'))
+                      .join('\n')
+                  )
+                })
+                .join('\n\n')
+
+            return licenseText
+          }
+        }
+      }
+    })
+  ]
+})
+```
+
+
+
