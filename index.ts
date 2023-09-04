@@ -395,13 +395,13 @@ async function init() {
   // (Currently it's only `cypress/plugin/index.ts`, but we might add more in the future.)
   // (Or, we might completely get rid of the plugins folder as Cypress 10 supports `cypress.config.ts`)
   /**
-   * 翻译一下：我们尝试在 TypeScript 和 JavaScript 之间共享尽可能多的文件。
-   * 如果无法实现这一点，我们将“.ts”版本“.js”版本旁边放在一起。
+   *  翻译一下：我们尝试在 TypeScript 和 JavaScript 之间复用尽可能多的文件。
+   * 如果无法实现这一点，我们将同时保留“.ts”版本和“.js”版本。
    * 因此，在所有模板渲染完毕后，我们需要清理冗余文件。
    * 目前只有'cypress/plugin/index.ts'是这种情况，但我们将来可能会添加更多。
-   * 或者，我们可能会完全摆脱插件文件夹，因为 Cypress 10 支持 'cypress.config.ts
+   * （或者，我们可能会完全摆脱插件文件夹，因为 Cypress 10 支持 'cypress.config.ts）
   */
-
+  // 集成 ts 的情况下，对 js 文件做转换，不集成 ts 的情况下，将模板中的 ts 相关的文件都删除
   if (needsTypeScript) {
     // Convert the JavaScript template to the TypeScript
     // Check all the remaining `.js` files:
@@ -409,29 +409,36 @@ async function init() {
     //   - Otherwise, rename the `.js` file to `.ts`
     // Remove `jsconfig.json`, because we already have tsconfig.json
     // `jsconfig.json` is not reused, because we use solution-style `tsconfig`s, which are much more complicated.
+    // 将JS模板转化为TS模板，先扫描所有的 js 文件，如果跟其同名的 ts 文件存在，则直接删除 js 文件，否则将 js 文件重命名为 ts 文件
+    // 直接删除 jsconfig.json 文件
     preOrderDirectoryTraverse(
       root,
       () => {},
       (filepath) => {
+        // 文件处理回调函数：如果是 .js 文件，则将其后缀变为 .ts 文件
         if (filepath.endsWith('.js')) {
-          const tsFilePath = filepath.replace(/\.js$/, '.ts')
+          const tsFilePath = filepath.replace(/\.js$/, '.ts') // 先计算js文件对应的ts文件的文件名
+          // 如果已经存在相应的 ts 文件，则删除 js 文件，否则将 js 文件重命名为 ts 文件
           if (fs.existsSync(tsFilePath)) {
             fs.unlinkSync(filepath)
           } else {
             fs.renameSync(filepath, tsFilePath)
           }
-        } else if (path.basename(filepath) === 'jsconfig.json') {
+        } else if (path.basename(filepath) === 'jsconfig.json') { // 直接删除 jsconfig.json 文件
           fs.unlinkSync(filepath)
         }
       }
     )
 
     // Rename entry in `index.html`
+    // 读取 index.html 文件内容
     const indexHtmlPath = path.resolve(root, 'index.html')
     const indexHtmlContent = fs.readFileSync(indexHtmlPath, 'utf8')
+    // 将 index.html 中的 main.js 的引入替换为 main.ts 的引入
     fs.writeFileSync(indexHtmlPath, indexHtmlContent.replace('src/main.js', 'src/main.ts'))
   } else {
     // Remove all the remaining `.ts` files
+    // 将模板中的 ts 相关的文件都删除
     preOrderDirectoryTraverse(
       root,
       () => {},

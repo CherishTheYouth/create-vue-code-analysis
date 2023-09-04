@@ -1506,43 +1506,7 @@ render('base')
 if (needsJsx) {
     render('config/jsx')
 }
-if (needsRouter) {
-    render('config/router')
-}
-if (needsPinia) {
-    render('config/pinia')
-}
-if (needsVitest) {
-    render('config/vitest')
-}
-if (needsCypress) {
-    render('config/cypress')
-}
-if (needsCypressCT) {
-    render('config/cypress-ct')
-}
-if (needsPlaywright) {
-    render('config/playwright')
-}
-if (needsTypeScript) {
-    render('config/typescript')
-
-    // Render tsconfigs
-    render('tsconfig/base')
-    if (needsCypress) {
-        render('tsconfig/cypress')
-    }
-    if (needsCypressCT) {
-        render('tsconfig/cypress-ct')
-    }
-    if (needsPlaywright) {
-        render('tsconfig/playwright')
-    }
-    if (needsVitest) {
-        render('tsconfig/vitest')
-    }
-}
-
+...
 // Render ESLint config
 if (needsEslint) {
     renderEslint(root, { needsTypeScript, needsCypress, needsCypressCT, needsPrettier })
@@ -1759,42 +1723,73 @@ if (needsPinia && needsRouter) {
 - ts 和 js 的差异化处理
 
 ```ts
+// directoryTraverse.ts
+function preOrderDirectoryTraverse(dir, dirCallback, fileCallback) {
+  // 读取目录文件（同步）
+  for (const filename of fs.readdirSync(dir)) {
+    // 跳过.git文件
+    if (filename === '.git') {
+      continue
+    }
+    const fullpath = path.resolve(dir, filename)
+    if (fs.lstatSync(fullpath).isDirectory()) {
+      // 使用给定回调函数对文件夹进行处理
+      dirCallback(fullpath)
+      // in case the dirCallback removes the directory entirely
+      // 递归调用方法前，先判断文件夹是否存在，避免文件被删除的情况
+      if (fs.existsSync(fullpath)) {
+        preOrderDirectoryTraverse(fullpath, dirCallback, fileCallback)
+      }
+      continue
+    }
+    fileCallback(fullpath)
+  }
+}
+
 // We try to share as many files between TypeScript and JavaScript as possible.
-  // If that's not possible, we put `.ts` version alongside the `.js` one in the templates.
-  // So after all the templates are rendered, we need to clean up the redundant files.
-  // (Currently it's only `cypress/plugin/index.ts`, but we might add more in the future.)
-  // (Or, we might completely get rid of the plugins folder as Cypress 10 supports `cypress.config.ts`)
-// 翻译一下：我们尝试在 TypeScript 和 JavaScript 之间共享尽可能多的文件。如果无法实现这一点，我们将“.ts”版本“.js”版本旁边放在一起。因此，在所有模板渲染完毕后，我们需要清理冗余文件。（目前只有'cypress/plugin/index.ts'是这种情况，但我们将来可能会添加更多。（或者，我们可能会完全摆脱插件文件夹，因为 Cypress 10 支持 'cypress.config.ts）
-  if (needsTypeScript) {
+// If that's not possible, we put `.ts` version alongside the `.js` one in the templates.
+// So after all the templates are rendered, we need to clean up the redundant files.
+// (Currently it's only `cypress/plugin/index.ts`, but we might add more in the future.)
+// (Or, we might completely get rid of the plugins folder as Cypress 10 supports `cypress.config.ts`)
+// 翻译一下：我们尝试在 TypeScript 和 JavaScript 之间复用尽可能多的文件。如果无法实现这一点，我们将同时保留“.ts”版本和“.js”版本。因此，在所有模板渲染完毕后，我们需要清理冗余文件。（目前只有'cypress/plugin/index.ts'是这种情况，但我们将来可能会添加更多。（或者，我们可能会完全摆脱插件文件夹，因为 Cypress 10 支持 'cypress.config.ts）
+// 集成 ts 的情况下，对 js 文件做转换，不集成 ts 的情况下，将模板中的 ts 相关的文件都删除
+if (needsTypeScript) {
     // Convert the JavaScript template to the TypeScript
     // Check all the remaining `.js` files:
     //   - If the corresponding TypeScript version already exists, remove the `.js` version.
     //   - Otherwise, rename the `.js` file to `.ts`
     // Remove `jsconfig.json`, because we already have tsconfig.json
     // `jsconfig.json` is not reused, because we use solution-style `tsconfig`s, which are much more complicated.
+    // 将JS模板转化为TS模板，先扫描所有的 js 文件，如果跟其同名的 ts 文件存在，则直接删除 js 文件，否则将 js 文件重命名为 ts 文件
+    // 直接删除 jsconfig.json 文件
     preOrderDirectoryTraverse(
       root,
       () => {},
       (filepath) => {
+        // 文件处理回调函数：如果是 js 文件，则将其后缀变为 .ts 文件
         if (filepath.endsWith('.js')) {
-          const tsFilePath = filepath.replace(/\.js$/, '.ts')
+          const tsFilePath = filepath.replace(/\.js$/, '.ts') // 先计算js文件对应的ts文件的文件名
+          // 如果已经存在相应的 ts 文件，则删除 js 文件，否则将 js 文件重命名为 ts 文件
           if (fs.existsSync(tsFilePath)) {
             fs.unlinkSync(filepath)
           } else {
             fs.renameSync(filepath, tsFilePath)
           }
-        } else if (path.basename(filepath) === 'jsconfig.json') {
+        } else if (path.basename(filepath) === 'jsconfig.json') { // 直接删除 jsconfig.json 文件
           fs.unlinkSync(filepath)
         }
       }
     )
 
-    // Rename entry in `index.html`
-    const indexHtmlPath = path.resolve(root, 'index.html')
-    const indexHtmlContent = fs.readFileSync(indexHtmlPath, 'utf8')
-    fs.writeFileSync(indexHtmlPath, indexHtmlContent.replace('src/main.js', 'src/main.ts'))
-  } else {
+// Rename entry in `index.html`
+// 读取 index.html 文件内容
+const indexHtmlPath = path.resolve(root, 'index.html')
+const indexHtmlContent = fs.readFileSync(indexHtmlPath, 'utf8')、
+// 将 index.html 中的 main.js 的引入替换为 main.ts 的引入
+fs.writeFileSync(indexHtmlPath, indexHtmlContent.replace('src/main.js', 'src/main.ts'))
+} else {
     // Remove all the remaining `.ts` files
+    // 将模板中的 ts 相关的文件都删除
     preOrderDirectoryTraverse(
       root,
       () => {},
@@ -1804,7 +1799,190 @@ if (needsPinia && needsRouter) {
         }
       }
     )
-  }
+}
 ```
 
- 
+最后是对集成 ts 的文件处理，这里依然是递归的对目录进行扫描，针对文件夹和文件传不同的回调函数，做不同的处理。
+
+在模板里面，大部分 js 和 ts 文件是可以复用的，只需要修改名字即可，但某些文件，差异比较大，无法复用，同时保留了 js 文件和 ts 文件2个版本。在处理的时候，对应可复用文件，这里会按照是否集成 ts 对文件名进行修改，对不可复用文件，则会根据集成选项的不同，删除 对应 js 文件或 ts 文件。
+
+- readme.md 文件
+
+```ts
+// Instructions:
+// Supported package managers: pnpm > yarn > npm
+const userAgent = process.env.npm_config_user_agent ?? '' // process.env.npm_config_user_agent 获取当前执行的包管理器的名称和版本
+const packageManager = /pnpm/.test(userAgent) ? 'pnpm' : /yarn/.test(userAgent) ? 'yarn' : 'npm'
+
+// README generation
+fs.writeFileSync(
+    path.resolve(root, 'README.md'),
+    generateReadme({
+      projectName: result.projectName ?? result.packageName ?? defaultProjectName,
+      packageManager,
+      needsTypeScript,
+      needsVitest,
+      needsCypress,
+      needsPlaywright,
+      needsCypressCT,
+      needsEslint
+    })
+)
+
+// generateReadme.ts
+// 针对不同的操作，根据包管理工具的不同，输出对应的命令，主要是区分 yarn 和 (p)npm 吧，毕竟 pnpm 和 npm 命令差不多
+export default function getCommand(packageManager: string, scriptName: string, args?: string) {
+  if (scriptName === 'install') {
+    return packageManager === 'yarn' ? 'yarn' : `${packageManager} install`
+  }
+
+  if (args) {
+    return packageManager === 'npm'
+      ? `npm run ${scriptName} -- ${args}`
+      : `${packageManager} ${scriptName} ${args}`
+  } else {
+    return packageManager === 'npm' ? `npm run ${scriptName}` : `${packageManager} ${scriptName}`
+  }
+}
+
+// generateReadme.ts
+import getCommand from './getCommand'
+
+const sfcTypeSupportDoc = [
+  '',
+  '## Type Support for `.vue` Imports in TS',
+  '',
+  'TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [TypeScript Vue Plugin (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.vscode-typescript-vue-plugin) to make the TypeScript language service aware of `.vue` types.',
+  '',
+  "If the standalone TypeScript plugin doesn't feel fast enough to you, Volar has also implemented a [Take Over Mode](https://github.com/johnsoncodehk/volar/discussions/471#discussioncomment-1361669) that is more performant. You can enable it by the following steps:",
+  '',
+  '1. Disable the built-in TypeScript Extension',
+  "    1) Run `Extensions: Show Built-in Extensions` from VSCode's command palette",
+  '    2) Find `TypeScript and JavaScript Language Features`, right click and select `Disable (Workspace)`',
+  '2. Reload the VSCode window by running `Developer: Reload Window` from the command palette.',
+  ''
+].join('\n')
+
+export default function generateReadme({
+  projectName,
+  packageManager,
+  needsTypeScript,
+  needsCypress,
+  needsCypressCT,
+  needsPlaywright,
+  needsVitest,
+  needsEslint
+}) {
+  const commandFor = (scriptName: string, args?: string) => getCommand(packageManager, scriptName, args)
+  let readme = `# ${projectName}
+
+This template should help get you started developing with Vue 3 in Vite.
+
+## Recommended IDE Setup
+
+[VSCode](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur) + [TypeScript Vue Plugin (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.vscode-typescript-vue-plugin).
+${needsTypeScript ? sfcTypeSupportDoc : ''}
+## Customize configuration
+
+See [Vite Configuration Reference](https://vitejs.dev/config/).
+
+## Project Setup
+`
+
+  let npmScriptsDescriptions = `\`\`\`sh
+${commandFor('install')}
+\`\`\`
+
+### Compile and Hot-Reload for Development
+
+\`\`\`sh
+${commandFor('dev')}
+\`\`\`
+
+### ${needsTypeScript ? 'Type-Check, ' : ''}Compile and Minify for Production
+
+\`\`\`sh
+${commandFor('build')}
+\`\`\`
+`
+
+  if (needsVitest) {
+    npmScriptsDescriptions += `
+### Run Unit Tests with [Vitest](https://vitest.dev/)
+
+\`\`\`sh
+${commandFor('test:unit')}
+\`\`\`
+`
+  }
+
+  if (needsCypressCT) {
+    npmScriptsDescriptions += `
+### Run Headed Component Tests with [Cypress Component Testing](https://on.cypress.io/component)
+
+\`\`\`sh
+${commandFor('test:unit:dev')} # or \`${commandFor('test:unit')}\` for headless testing
+\`\`\`
+`
+  }
+
+  if (needsCypress) {
+    npmScriptsDescriptions += `
+### Run End-to-End Tests with [Cypress](https://www.cypress.io/)
+
+\`\`\`sh
+${commandFor('test:e2e:dev')}
+\`\`\`
+
+This runs the end-to-end tests against the Vite development server.
+It is much faster than the production build.
+
+But it's still recommended to test the production build with \`test:e2e\` before deploying (e.g. in CI environments):
+
+\`\`\`sh
+${commandFor('build')}
+${commandFor('test:e2e')}
+\`\`\`
+`
+  }
+
+  if (needsPlaywright) {
+    npmScriptsDescriptions += `
+### Run End-to-End Tests with [Playwright](https://playwright.dev)
+
+\`\`\`sh
+# Install browsers for the first run
+npx playwright install
+
+# When testing on CI, must build the project first
+${commandFor('build')}
+
+# Runs the end-to-end tests
+${commandFor('test:e2e')}
+# Runs the tests only on Chromium
+${commandFor('test:e2e', '--project=chromium')}
+# Runs the tests of a specific file
+${commandFor('test:e2e', 'tests/example.spec.ts')}
+# Runs the tests in debug mode
+${commandFor('test:e2e', '--debug')}
+\`\`\`
+`
+  }
+
+  if (needsEslint) {
+    npmScriptsDescriptions += `
+### Lint with [ESLint](https://eslint.org/)
+
+\`\`\`sh
+${commandFor('lint')}
+\`\`\`
+`
+  }
+
+  readme += npmScriptsDescriptions
+  return readme
+}
+```
+
+生成 readme.md 的操作，主要是一些文本字符串的拼接操作，根据使用者的包管理工具的不同，生成不同的 readme.md 文档。经过前面的分析，再看这块，就觉得很简单了。
+
