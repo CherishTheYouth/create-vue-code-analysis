@@ -51,6 +51,7 @@ await esbuild.build({
             resolveDir,
             kind: 'import-statement'
           })
+          console.log('esbuild-prompts-result', result)
           return result
         })
       }
