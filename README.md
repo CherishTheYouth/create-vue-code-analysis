@@ -2138,9 +2138,108 @@ await esbuild.build({
 })
 ```
 
+下面分2方面解析一下以上代码，1. esbuild.build `api` 讲解；2. 连个具体的 `plugin` 功能讲解；
+
+#### (1) esbuild.build Api
+
+
+
+#### (2) plugins
+
+`esbuild` 的 `plugin` 的用法在上一部分已做出详解。这里我们来分析 `build.mjs ` 中的2个插件的具体作用。
+
+首先是第一个插件：对 `prompts` 的打包处理。
+
+```js
+{
+  name: 'alias',
+    setup({ onResolve, resolve }) {
+    // 使用onResolve添加的回调将在esbuild构建的每个模块中的每个导入路径上运行。回调可以自定义esbuild如何进行路径解析
+    onResolve({ filter: /^prompts$/, namespace: 'file' }, async ({ importer, resolveDir }) => {
+      // we can always use non-transpiled code since we support 14.16.0+
+      const result = await resolve('prompts/lib/index.js', {
+        importer,
+        resolveDir,
+        kind: 'import-statement'
+      })
+      console.log('esbuild-prompts-result', result)
+      return result
+    })
+  }
+},
+```
+
+这段代码通过插件拦截(或者说捕获) `prompts` 的路径导入，并将其更改为从 `prompts/lib/index.js` 导入（通常情况下默认从根目录下的index.js导入）。
+
+因为一直搞不明白这个插件的具体作用，所以通过手动注释该插件的方法，重新进行 `build` 操作，生成未使用此 `plugin`处理 的 `outfile.cjs` 文件，并运行此文件，执行脚手架搭建工程。执行结果显示发现并未对脚手架的功能造成任何影响。
+
+接着，将包含`plugin` 和 不含 `plugin` 的输出文件进行比对，发现，两个文件的代码大部分相同，仅有的差别在于添加插件的 `outfile.cjs` 文件中的 `prompts` 的导入路径仅有 `prompts/lib/...`, 而未添加插件的版本，`outfile.cjs`文件中同时包含 2 份相同的`prompts`代码实现（导入路径分别为 `prompts/lib/...` 和 `prompts/dist/...`）。最初对此感到困惑，为何会多出一份，作用是什么。
+
+![image-20230906222037326](https://cherish-1256678432.cos.ap-nanjing.myqcloud.com/typora/image-20230906222037326.png)
+
+后来揣测此插件仅是用来做打包体积优化的，并无其他用意，毕竟2个版本文件大小相差近一半。
+
+| outfile.cjs           | 体积  |
+| --------------------- | ----- |
+| outfile-no-alias.cjs  | 233kb |
+| outfile-with-alia.cjs | 143kb |
+
+![image-20230906223730986](https://cherish-1256678432.cos.ap-nanjing.myqcloud.com/typora/image-20230906223730986.png)
+
+![image-20230906223802744](https://cherish-1256678432.cos.ap-nanjing.myqcloud.com/typora/image-20230906223802744.png)
+
+但是毕竟水平有限，不能完全确定，推测如不得到证实，始终心有不甘。后来想到，或许可以找到此文件的提交记录，看作者提交的意图是啥（毕竟咱也不认识豪群大佬，不能直接请教他）。果不其然，猜想得到证实，以下是该部分代码的提交记录：
+[perf: exclude transpiled prompts code](https://github.com/vuejs/create-vue/pull/121)
+
+![image-20230906224935055](https://cherish-1256678432.cos.ap-nanjing.myqcloud.com/typora/image-20230906224935055.png)
+
+以上提交来自一个社区贡献者，大意是，**既然这个包仅支持 node > 14.6 的版本，那么转译的 `prompts` 代码必然不会被用到，也就可以在打包时排除掉**。
+
+看到这里，自然想到去扒开 `prompts` 库看看，到底咋回事。
+
+![image-20230906225323476](https://cherish-1256678432.cos.ap-nanjing.myqcloud.com/typora/image-20230906225323476.png)
+
+恍然大悟，原来如此。`prompts` 为了兼容低版本的 `node` 环境，准备了 2 份库文件，其中在 `dist` 目录下的是一份转译后的版本。而在 `esbuild` 进行依赖打包时，递归的解析依赖，所以此处会将2个版本的 `prompts` 都进行打包。但在这个场景下，`create-vue` 的打包条件已经限制在 `node > 14`, 也即是说 `/dist/..` 下的版本永远不会被使用，这个包完全没有必要打进去。所以，这个插件在依赖解析时，直接从 `/lib/...` 下导入，大大减小了输出包的体积。
+
+至此，我之前的猜想也可到印证，内心阴霾一扫而空，开心。😁
+
+接下来是第二个插件：esbuildPluginLicense
+
+插件GitHub地址：[esbuildPluginLicense](https://github.com/upupming/esbuild-plugin-license#)
+
+简介：License generation tool similar to https://github.com/mjeanroy/rollup-plugin-license
+
+用法：
+
+```ts
+export const defaultOptions: DeepRequired<Options> = {
+  banner: `/*! <%= pkg.name %> v<%= pkg.version %> | <%= pkg.license %> */`,
+  thirdParty: {
+    includePrivate: false,
+    output: {
+      file: 'dependencies.txt',
+      // Template function that can be defined to customize report output
+      template(dependencies) {
+        return dependencies.map((dependency) => `${dependency.packageJson.name}:${dependency.packageJson.version} -- ${dependency.packageJson.license}`).join('\n');
+      },
+    }
+  }
+} as const
+```
+
+这个插件主要是用来生成开源项目 License 的。
+
+点开 croate-vue 的 License 文件，发现原来是这里生成的，牛逼啊。👍
+
+这里的实现主要是生成 License 内容的操作，理解起来不难，这里需要注意的一点是，croate-vue 的 License 是将它所依赖的三方库的 License 都带上了，不仅仅是它自己的 License 内容。这充分体现了作者对三方库作者，对知识产权的尊重，值得深思和学习。
+
+![image-20230906231728091](https://cherish-1256678432.cos.ap-nanjing.myqcloud.com/typora/image-20230906231728091.png)
+
+![image-20230906231747317](https://cherish-1256678432.cos.ap-nanjing.myqcloud.com/typora/image-20230906231747317.png)
+
 ### 2. snapshot
 
-将所有种类的选项配置生成的脚手架工程全部生成一遍，保存到 playground 目录
+将所有种类的选项配置生成的脚手架工程全部生成一遍，保存到 playground 目录。
 
 
 
