@@ -2025,12 +2025,14 @@ console.log()
 
 ## croate-vue 是如何打包的？
 
+### 1. build
+
 一个工程化的项目，为了程序的可维护性等方面的需求，总是需要将不同功能的文件按照其职能进行分类管理，但是在实际使用过程中，不可能基于原始工程去直接使用，需要通过打包工具将项目打包为一个庞大的单文件。`create-vue` 打包指令如下：
 
 ```ts
 "scripts": {
-    "build": "zx ./scripts/build.mjs",
-  },
+	"build": "zx ./scripts/build.mjs",
+},
 ```
 
 该指令执行了 `./scripts/build.mjs` 文件，接下来结合代码来分析一下打包过程。
@@ -2073,6 +2075,11 @@ await esbuild.build({
   target: 'node14',
 
   plugins: [
+    // 此插件主要是解决 prompts 打包版本的问题，优化打包大小。是社区作者贡献的一段代码
+  	// prompts 在 node 版本小于8.6时，使用 prompts/dist 下的包(此目录下的包经过转译，体积稍大)，在 node 版本大于 8.6 时，使用 prompts/lib 下的包
+    // 参见如下提交
+    // (https://github.com/vuejs/create-vue/pull/121)
+  	// (https://github.com/terkelg/prompts/blob/a0c1777ae86d04e46cb42eb3af69ca74ae5d79e2/index.js#L11-L14)
     {
       name: 'alias',
       setup({ onResolve, resolve }) {
@@ -2087,6 +2094,7 @@ await esbuild.build({
         })
       }
     },
+    // 生成开源项目的 LICENSE 文件，主要分为2部分，一部分是 create-vue 自己的 LICENSE，一部分是项目所使用依赖的 LICENSE
     esbuildPluginLicense({
       thirdParty: {
         includePrivate: false,
@@ -2129,6 +2137,10 @@ await esbuild.build({
   ]
 })
 ```
+
+### 2. snapshot
+
+将所有种类的选项配置生成的脚手架工程全部生成一遍，保存到 playground 目录
 
 
 

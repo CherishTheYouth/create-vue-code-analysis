@@ -34,7 +34,6 @@ function fullCombination(arr) {
     }
     combinations.push(combination)
   }
-
   return combinations
 }
 
