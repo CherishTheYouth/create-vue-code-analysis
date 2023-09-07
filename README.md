@@ -2142,7 +2142,101 @@ await esbuild.build({
 
 #### (1) esbuild.build Api
 
+这部分只要还是翻译官方文档了，因为核心关注点不在这块，属于快速科普，达到能理解的目的即可。
 
+> [esbuild 官方文档](https://esbuild.github.io/api/#transform)
+
+Esbuild 支持 `JavaScript` 和 `GoLang` 2种语言。其中 `JavaScript Api` 有异步和同步两种类型。建议使用异步API，因为它适用于所有环境，并且速度更快、功能更强大。同步 Api 仅在 `node` 环境下工作，但在某些情况下也是必要的。
+
+同步API调用使用promise返回其结果。需要注意的是，由于使用了 `import`和 `await`关键字，需要在 `node`环境 中使用.mjs文件扩展名。
+
+> 扩展资料：为什么使用了这2个关键字，在node环境中需要使用 `.mjs` 扩展名？
+>
+> [node.js如何处理esm模块](https://www.ruanyifeng.com/blog/2020/08/how-nodejs-use-es6-module.html)
+>
+> JavaScript 语言有两种格式的模块，一种是 ES6 模块，简称 ESM；另一种是 Node.js 专用的 CommonJS 模块，简称 CJS。这两种模块不兼容。
+>
+> ES6 模块和 CommonJS 模块有很大的差异。语法上面，CommonJS 模块使用`require()`加载和`module.exports`输出，ES6 模块使用`import`和`export`。用法上面，`require()`是同步加载，后面的代码必须等待这个命令执行完，才会执行。`import`命令则是异步加载，或者更准确地说，ES6 模块有一个独立的静态解析阶段，依赖关系的分析是在那个阶段完成的，最底层的模块第一个执行。
+>
+> Node.js 要求 ES6 模块采用`.mjs`后缀文件名。也就是说，只要脚本文件里面使用`import`或者`export`命令，那么就必须采用`.mjs`后缀名。Node.js 遇到`.mjs`文件，就认为它是 ES6 模块，默认启用严格模式，不必在每个模块文件顶部指定`"use strict"`。
+
+```js
+import * as esbuild from 'esbuild'
+
+let result = await esbuild.build({
+  bundle: true, // 是否打包
+  entryPoints: ['index.ts'], // 入口
+  outfile: 'outfile.cjs', // 出口
+  format: 'cjs', // 输出格式 commonJS
+  platform: 'node', // 平台
+  target: 'node14',
+	plugin: []
+})
+```
+
+- bundle
+
+打包文件意味着将任何导入的依赖项内联到文件本身。这个过程是递归的，因此依赖项的依赖项也将内联。默认情况下，esbuild不会打包输入文件，必须显式启用。如上示例，传 `true` 表示显式启用。
+
+- entryPoints
+
+入口文件，表示从那个文件开始进行打包。entryPoints 是一个数组，支持多个入口文件，多个入口文件，会生成多个输出文件。因此，如果是相对简单的应用，建议将所有文件统一导入到一个文件，再将该文件作为入口进行打包。如果导入多个入口文件，则必须指定一个 `outdir` 目录。
+
+- outfile
+
+设置输出文件名。该属性仅在从单个入口文件打包时有效。如果有多个入口文件，则必须指定`outdir` 目录。 
+
+- format
+
+打包输出的文件格式，有 `iife` 、`cjs` 、`esm` 三种形式。
+
+- platform
+
+默认情况下，esbuild的 `bundler` 被配置为生成用于浏览器的代码。如果您的`bundle`代码打算在`node`中运行，您应该将平台设置为`node`.
+
+- target
+
+为生成的JavaScript 或 CSS 代码设置目标环境。它告诉`esbuild`将对这些环境来说太新的`JavaScript`语法转换为在这些环境中能正常运行的的旧`JavaScript` 语法。
+
+- plugin
+
+plugin API 支持用户将代码注入到构建过程的各个部分。与其他API不同，它无法从命令行输入配置。必须编写JavaScript或Go代码才能使用插件API。
+
+一个插件是一个包含 `name` 属性和 `setup` 方法的对象。通过一个数组传递给 `build Api`. 每次 build Api 调用都会运行一次`setup`函数。
+
+> onResolve
+>
+> 使用onResolve添加的回调将在esbuild.build 每个模块的导入路径上运行。回调可以自定义 esbuild 如何进行路径解析。例如，它可以拦截导入路径并将其重定向到其他地方。它也可以将路径标记为外部路径。以下是一个示例：
+>
+> ```ts
+> import * as esbuild from 'esbuild'
+> import path from 'node:path'
+> 
+> let exampleOnResolvePlugin = {
+>   name: 'example',
+>   setup(build) {
+>     // Redirect all paths starting with "images/" to "./public/images/"
+>     build.onResolve({ filter: /^images\// }, args => {
+>       return { path: path.join(args.resolveDir, 'public', args.path) }
+>     })
+> 
+>     // Mark all paths starting with "http://" or "https://" as external
+>     build.onResolve({ filter: /^https?:\/\// }, args => {
+>       return { path: args.path, external: true }
+>     })
+>   },
+> }
+> 
+> await esbuild.build({
+>   entryPoints: ['app.js'],
+>   bundle: true,
+>   outfile: 'out.js',
+>   plugins: [exampleOnResolvePlugin],
+>   loader: { '.png': 'binary' },
+> })
+> ```
+>
+> 
 
 #### (2) plugins
 
