@@ -18,6 +18,8 @@ try {
     throw e
   }
 }
+// 前一部分，运行指令进行构建，快照生成，并将快照推到 playground 子仓库中
+// ----------------------------------------------------------
 
 await $`git tag -m "v${version}" v${version}`
 await $`git push --follow-tags`
@@ -27,3 +29,5 @@ cd(projectRoot)
 await $`git add playground`
 await $`git commit -m 'chore: update snapshot' --allow-empty`
 await $`git push --follow-tags`
+// 后一部分则将整体的更改推送到主仓库，其中包含添加版本号和tag的操作
+// ----------------------------------------------------------

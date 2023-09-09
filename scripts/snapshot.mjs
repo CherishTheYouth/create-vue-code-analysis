@@ -1,7 +1,9 @@
 #!/usr/bin/env zx
-import 'zx/globals'
+// 在 `zx` 脚本文件顶部添加事务声明，之后可以无需导入直接调用 zx 的各类函数。
 
-$.verbose = false
+import 'zx/globals' // 此处显式引入是为了获得更好的 vscode 辅助编码支持，也可不导入
+
+$.verbose = false // 关闭详细输出模式
 
 if (!/pnpm/.test(process.env.npm_config_user_agent ?? ''))
   throw new Error("Please use pnpm ('pnpm run snapshot') to generate snapshots!")
@@ -39,13 +41,14 @@ function fullCombination(arr) {
 
 let flagCombinations = fullCombination(featureFlags)
 flagCombinations.push(['default'])
+console.log('flagCombinations-1', flagCombinations.length)
 
 // Filter out combinations that are not allowed
 flagCombinations = flagCombinations.filter(
   (combination) =>
     !featureFlagsDenylist.some((denylist) => denylist.every((flag) => combination.includes(flag)))
 )
-
+console.log('flagCombinations-2', flagCombinations.length)
 // `--with-tests` are equivalent of `--vitest --cypress`
 // Previously it means `--cypress` without `--vitest`.
 // Here we generate the snapshots only for the sake of easier comparison with older templates.
@@ -57,6 +60,8 @@ const withTestsFlags = fullCombination(['typescript', 'jsx', 'router', 'pinia'])
 withTestsFlags.push(['with-tests'])
 
 flagCombinations.push(...withTestsFlags)
+
+console.log('flagCombinations-3', flagCombinations.length)
 
 const playgroundDir = path.resolve(__dirname, '../playground/')
 const bin = path.posix.relative('../playground/', '../outfile.cjs')
