@@ -1,50 +1,48 @@
-# create-vue脚手架是怎么实现的？
+# Vue.js 官方脚手架 create-vue 是怎么实现的？
 
-## 先把源码clone下来
+![create-vue-blog](https://cherish-1256678432.cos.ap-nanjing.myqcloud.com/typora/create-vue-blog.jpg)
+
+## 摘要
+
+本文共分为四个部分，系统解析了`vue.js` 官方脚手架 `create-vue` 的实现细节。
+
+第一部分主要是一些准备工作，如源码下载、项目组织结构分析、依赖分析、功能点分析等；
+
+第二部分分析了 `create-vue` 脚手架是如何执行的，执行文件的生成细节；
+
+第三部分是本文的核心部分，主要分析了终端交互和配置读取的实现细节、脚手架工程生成细节；
+
+第四部分则是 `create-vue` 的打包、快照、预发布等脚本的实现。
+
+😄 全文近2万字，阅读耗时长，建议收藏慢慢看哦！
+
+
+
+## 原文地址 + 详细注释版源码地址
+
+[create-vue-code-analysis](https://github.com/CherishTheYouth/create-vue-code-analysis)
+
+😊 如果觉得还可以的话，可以给个🌟吗，嘿嘿嘿！
+
+
+
+## 准备工作
+
+### 1. 获取源码 🐯
+
+源码地址：[create-vue](https://github.com/vuejs/create-vue)
+
+源码版本：3.6.4
 
 目录结构如下：
 
-```txt
-F:\Study\Vue\Code\VueSourceCode\create-vue
-├── CONTRIBUTING.md
-├── create-vue-tree.txt
-├── index.ts
-├── LICENSE
-├── media
-|  └── screenshot-cli.png
-├── package.json
-├── playground
-├── pnpm-lock.yaml
-├── pnpm-workspace.yaml
-├── README.md
-├── renovate.json
-├── scripts
-|  ├── build.mjs
-|  ├── prepublish.mjs
-|  ├── snapshot.mjs
-|  └── test.mjs
-├── template
-|  ├── base
-|  ├── code
-|  ├── config
-|  ├── entry
-|  ├── eslint
-|  └── tsconfig
-├── tsconfig.json
-└── utils
-   ├── banners.ts
-   ├── deepMerge.ts
-   ├── directoryTraverse.ts
-   ├── generateReadme.ts
-   ├── getCommand.ts
-   ├── renderEslint.ts
-   ├── renderTemplate.ts
-   └── sortDependencies.ts
-```
+![image-20230910112302032](https://cherish-1256678432.cos.ap-nanjing.myqcloud.com/typora/image-20230910112302032.png)
 
-## 看看package.json
+### 2. package.json文件预览 👀
 
-看看整个项目中用到了那些依赖，那些技术点，都是干啥的？
+如果希望系统分析源码，建议先看看整个项目中用到了那些依赖，那些技术点，都是干啥的？对于一些不了解的依赖，可以提前了解一下。也可以通过依赖大致分析出项目的解决思路。
+
+以下是 `create-vue` 的 `package.json` 文件。
 
 ```json
 {
@@ -109,7 +107,7 @@ F:\Study\Vue\Code\VueSourceCode\create-vue
 
 ```
 
-每个包的作用是啥？
+下表中一句话简单介绍了每个包的作用：
 
 | 依赖名                    | 功能                                                         |
 | ------------------------- | ------------------------------------------------------------ |
@@ -118,30 +116,29 @@ F:\Study\Vue\Code\VueSourceCode\create-vue
 | @types/node               | node.js的类型定义                                            |
 | @vue/create-eslint-config | 在Vue.js项目中设置ESLint的实用程序。                         |
 | @vue/tsconfig             | 用于Vue项目的TS Configure扩展。                              |
-| esbuild                   | 这是一个JavaScript打包器和压缩器。                           |
-| esbuild-plugin-license    | 许可证生成工具                                               |
-| husky                     | git 钩子规范工具                                             |
-| kolorist                  | 给stdin/stdout的文本内容添加颜色                             |
+| esbuild                   | JavaScript 和 golang 打包工具，在打包时使用，后文会具体分析，建议预先了解，尤其是 esbuild.build 函数的相关 Api |
+| esbuild-plugin-license    | 许可证生成插件，用于在打包时，生成 LICENSE 文件              |
+| husky                     | git 钩子，代码提交规范工具                                   |
+| kolorist                  | 给stdin/stdout的文本内容添加颜色，建议预先了解。             |
 | lint-staged               | 格式化代码                                                   |
-| minimist                  | 解析参数选项， 当用户从 terminal 中输入命令指令时，帮助解析各个参数的工具 |
+| minimist                  | 解析参数选项， 当用户从 terminal 中输入命令指令时，帮助解析各个参数的工具，建议预先了解。 |
 | npm-run-all               | 一个CLI工具，用于并行或顺序运行多个npm-script。              |
-| prettier                  | 代码格式化的                                                 |
-| prompts                   | 轻巧、美观、人性化的交互式提示。在 terminal 中做对话交互的。 |
+| prettier                  | 代码格式化                                                   |
+| prompts                   | 轻巧、美观、人性化的交互式提示。在 terminal 中做对话交互的。建议预先了解。 |
 | @types/prompts            | prompts 库的类型定义                                         |
-| zx                        | 该库为开发者在JavaScript中编写shell脚本提供了一系例功能，使开发更方便快捷，主要在编写复杂的 script 命令是使用。 |
+| zx                        | 该库为开发者在JavaScript中编写shell脚本提供了一系例功能，使开发更方便快捷，主要在编写复杂的 script 命令是使用。只要在打包，快照，预发布阶段编写脚本时使用，建议预先了解。 |
 
 可以看到，这16个依赖，真正和cli功能紧密相关的应该是以下几个：
 
 - esbuild
 - kolorist
 - minimist
-- npm-run-all
 - prompts
 - zx
 
 所以，学习 create-vue 的之前，可以先阅读以下几个库的基本使用方法，以便在阅读源码过程中，遇到有知识点盲区的，可以定向学习。
 
-## 然后看一下项目的目录机构
+### 3. 项目目录结构及功能模块简介 🪜
 
 ```txt
 F:\Study\Vue\Code\VueSourceCode\create-vue
@@ -183,31 +180,35 @@ F:\Study\Vue\Code\VueSourceCode\create-vue
 
 可以看到，除开一些配置文件和空文件夹后，真正用到的文件就以下几个部分：
 
-1. .husky
+- husky
 
-   > 这个是跟代码提交相关的，跟核心功能无关了。
+> 这个是跟代码提交相关的，跟核心功能无关了。
 
-2. scripts
+- scripts
 
-   > 这个里面是项目里需要执行的一些脚本，把某些需要在终端里执行的操作，写到脚本中，一键式执行。类似shell脚本，bash脚本。与cli的核心流程也相关性不太大。
+> 主要是项目打包，生成快照，预发布，单元测试这几块内容的 `script` 脚本.
 
-3. template
+- template
 
-   > 这个里面是这个库的核心部分了——模板。我们 cli 在执行时，就是会从这个文件夹中读取各个配置的代码，最后把这些代码组合成一个完整的项目，然后给用户快速生成一个项目模板。
-   >
-   > 这个模板只要你事先预制好即可。
+> 这个里面是这个库的核心部分了——模板。我们 cli 在执行时，就是会从这个文件夹中读取各个配置的代码，最后把这些代码组合成一个完整的项目，然后给用户快速生成一个项目模板。
+>
+> 这个模板只要你事先预制好即可。
 
-4. utils
+- utils
 
-   > 项目中用到的一些工具库，用到的时候再具体去看。
+> 项目中用到的一些工具方法，可在用到的时候再具体去分析。
 
-5. index.ts
+- **index.ts**
 
-   > 这个文件才是 cli 创建工程模板的关键文件，这里面包含了cli执行的所有逻辑，是create-vue脚手架的核心实现。
+> 项目的入口文件，也是核心文件，包含了cli 执行的所有逻辑，是create-vue脚手架的核心实现。
 
-## 再来看下源码是怎么跑起来的，如何工作的？
+以上就是项目中一些具体模块的大致功能了，最最核心的还是 `index.ts ` 文件，我们将在第四个部分具体分析。
 
-### 1. 先看下我们的脚手架命令是怎么使用的？
+
+
+## create-vue是如何工作的？
+
+### 1. 脚手架命令是怎么使用的？🤔️
 
 下面是 create-vue 的用法：
 
@@ -217,23 +218,21 @@ npm create vue@3
 
 ![image-20230727192225526](https://cherish-1256678432.cos.ap-nanjing.myqcloud.com/typora/image-20230727192225526.png)
 
-常见的npm命令有 npm init, npm run, npm install等，但是 create 命令很少见，这里我们先看下，这个运行`npm create `会发生什么：
+常见的npm命令有 `npm init`,` npm run`,` npm install`等，但是 `create` 命令很少见，这里我们先看下，运行`npm create `会发生什么：
 
-参考资料：[npm create vite“ 是如何实现初始化 Vite 项目？](https://blog.csdn.net/Cyj1414589221/article/details/128191826)
-
-以下内容copy自参考资料：
-
+> 📖 参考资料：[npm create vite“ 是如何实现初始化 Vite 项目？](https://blog.csdn.net/Cyj1414589221/article/details/128191826)
+>
 > **npm `init` / `create` 命令**
 >
-> npm v6 版本给 `init` 命令添加了别名 `create`，俩命令一样的.
+> npm v6 版本给 `init` 命令添加了别名 `create`，俩命令是一样的.
 >
-> npm `init` 命令除了可以用来创建 package.json 文件，还可以用来执行一个包的命令；它后面还可以接一个 `<initializer>` 参数。该命令格式：
+> `npm init` 命令除了可以用来创建 `package.json` 文件，还可以用来执行一个包的命令；它后面还可以接一个 `<initializer>` 参数。该命令格式：
 >
 > ```bash
 > npm init <initializer>
 > ```
 >
-> 参数 initializer 是名为 create-<initializer> 的 npm 包 ( 例如 create-vite )，执行 npm init <initializer> 将会被转换为相应的 npm exec 操作，即会使用 npm exec 命令来运行 create-<initializer> 包中对应命令 create-<initializer>（**package.json 的 bin 字段指定**），例如：
+> 参数 `initializer` 是名为 `create-<initializer>` 的 `npm` 包 ( 例如 `create-vite` )，执行 `npm init <initializer>` 将会被转换为相应的 `npm exec` 操作，即会使用 `npm exec` 命令来运行 `create-<initializer>` 包中对应命令 `create-<initializer>`（**package.json 的 bin 字段指定**），例如：
 > ```bash
 > # 使用 create-vite 包的 create-vite 命令创建一个名为 my-vite-project 的项目
 > $ npm init vite my-vite-project
@@ -250,10 +249,11 @@ npm create vue@3
 
 具体的执行过程如下：
 
-1. `npm create vue`  转化 `npm exec create-vue` 命令，执行 `create-vue` 包；
-2. 执行 `create-vue` 具体是执行啥？执行 package.json 中bin 字段对应的 .js 文件。
+- `npm create vue`  转化 `npm exec create-vue` 命令，执行 `create-vue` 包；
 
-![image-20230727194838670](https://cherish-1256678432.cos.ap-nanjing.myqcloud.com/typora/image-20230727194838670.png)
+- 执行 `create-vue` 具体是执行啥？执行 package.json 中bin 字段对应的 .js 文件。
+
+![image-20230910142157965](https://cherish-1256678432.cos.ap-nanjing.myqcloud.com/typora/image-20230910142157965.png)
 
 ```json
 {
@@ -275,9 +275,9 @@ node outfile.cjs
 
 如下图，在`create-vue`的包中直接执行`node outfile.cjs` , 执行结果跟执行脚手架一致，这证明了以上的结论正确。
 
-![image-20230727200125908](https://cherish-1256678432.cos.ap-nanjing.myqcloud.com/typora/image-20230727200125908.png)
+![image-20230910142251313](https://cherish-1256678432.cos.ap-nanjing.myqcloud.com/typora/image-20230910142251313.png)
 
-### 2. outfile.cjs 文件从何而来？
+### 2. outfile.cjs 文件从何而来？❓
 
 outfile.cjs 从何而来呢？outfile.cjs是打包后的文件，这是显然的。我们找到脚手架打包的位置，查看一下它的入口文件即可。
 
@@ -297,9 +297,11 @@ await esbuild.build({
 
 入口文件就是 `index.ts` 了。
 
-接下来开始进入正题，我们集中分析 `index.ts `即可了。
+所以，我们后续的分析将主要集中在 `index.ts `文件。
 
-## 开始分析 index.ts 文件干了点啥
+
+
+## create-vue 的核心实现细节
 相比于动辄几万行的库来说，index.ts 并不复杂，包括注释，只有短短的460多行。
 我们先整体浏览一遍代码，大致了解下这个文件是怎么做到在短短400多行就完成了一个如此解除的脚手架。
 
@@ -385,12 +387,14 @@ const templateRoot = path.resolve(__dirname, 'template')
 }
 ```
 
-程序有点长，但是流程非常清晰直白，堪称极简主义的典范，相比于 vue cli 的各种回调方法处理，它没有一丝一毫的拐弯抹角。
-其实也就二个部分：
-1. 询问你想要啥？；
-2. 你想要啥我就给你啥；
+程序有点长，但是流程非常清晰直白，相比于 vue cli 的各种回调方法处理，它没有一丝一毫的拐弯抹角，对于想入门源码分析的同学比较友好。其实也就两个部分：
+- 询问用户需要什么配置的脚手架工程；
 
-### 1. 实现终端的交互逻辑，获取用户的选择
+- 根据用户配置生成相应的脚手架工程；
+
+下面首先分析第一部分：获取用户自定义配置；
+
+### 1. 实现终端的交互，获取用户的自定义配置 👍
 分析代码总是枯燥的，但是既然是读源码，那再枯燥也得坚持。最终我们还得回到代码上，逐行解析。请看
 
 ```ts
@@ -406,9 +410,7 @@ const templateRoot = path.resolve(__dirname, 'template')
 
 ![image-20230829230134126](https://cherish-1256678432.cos.ap-nanjing.myqcloud.com/typora/image-20230829230134126.png)
 
-这段代码主要就是为了实现脚本执行的这行标题了，判断脚本是否在终端中执行，然后判断终端环境是否能支持渐变色相关的能力，支持则输出一个渐变色的炫酷的 `banner` 提示，否则输出一个默认的朴素的 `banner` 提示。
-
-花里胡哨，但你不得不承认咋祖师爷的审美，vitepress 的全新UI风格真是绝绝子。
+这段代码主要就是为了实现脚本执行的这行标题了，判断脚本是否在终端中执行，然后判断终端环境是否能支持渐变色相关的能力，支持则输出一个渐变色的炫酷的 `banner` 提示，否则输出一个默认的朴素的 `banner` 提示。花里胡哨，但真的很好看啊。
 
 ```ts
   const cwd = process.cwd() // 当前node.js 进程执行时的工作目录
@@ -441,7 +443,7 @@ const templateRoot = path.resolve(__dirname, 'template')
   })
   console.log('argv:', argv)
 ```
-- process.argv
+- 📖 process.argv
 
 > process.argv 属性返回数组，其中包含启动 Node.js 进程时传入的命令行参数。其中第一个元素是 Node.js 的可执行文件路径，第二个元素是当前执行的 JavaScript 文件路径，之后的元素是命令行参数。process.argv.slice(2)，可去掉前两个元素，只保留命令行参数部分。
 
@@ -451,11 +453,11 @@ const templateRoot = path.resolve(__dirname, 'template')
 
 ![image-20230829232834955](https://cherish-1256678432.cos.ap-nanjing.myqcloud.com/typora/image-20230829232834955.png)
 
-- minimist
+- 📖 minimist
 
 > [minimist]([minimist - npm (npmjs.com)](https://www.npmjs.com/package/minimist))
 >
-> 是一个用于解析命令行参数的 JavaScript 函数库。它可以将命令行参数解析为一个对象，方便在代码中进行处理和使用。
+> **是一个用于解析命令行参数的 JavaScript 函数库**。**它可以将命令行参数解析为一个对象，方便在代码中进行处理和使用**。
 >
 > minimist 的作用是将命令行参数解析为一个对象，其中参数名作为对象的属性，参数值作为对象的属性值。它可以处理各种类型的命令行参数，包括带有选项标志的参数、带有值的参数以及没有值的参数。
 >
@@ -792,8 +794,11 @@ function canSkipEmptying(dir: string) {
 
 以上定义一个 `result` ，从其类型的定义不难看出，该对象用来保存 prompts 提示结束后用户选择的结果。
 
-接下来介绍生成项目之前的 prompts 提示部分。首先，先大致了解下 `prompts `库的用法：
->[prompts]([prompts - npm (npmjs.com)](https://www.npmjs.com/package/prompts))
+接下来介绍生成项目之前的 prompts 提示部分。
+
+首先，先大致了解下 `prompts `库的用法：
+
+>📖 [prompts]([prompts - npm (npmjs.com)](https://www.npmjs.com/package/prompts))
 >
 >prompts 是一个用于创建交互式命令行提示的 JavaScript 库。它可以方便地与用户进行命令行交互，接收用户输入的值，并根据用户的选择执行相应的操作。在 prompts 中，问题对象（prompt object）是用于定义交互式提示的配置信息。它包含了一些属性，用于描述问题的类型、提示信息、默认值等。
 >
@@ -810,7 +815,7 @@ function canSkipEmptying(dir: string) {
 >- onState：在用户输入值发生变化时触发的回调函数。它接受两个参数 state 和 prompt，分别表示当前的状态对象和问题对象。
 >- onSubmit：在用户完成所有问题的回答并提交之后触发的回调函数。它接受一个参数 result，表示用户的回答结果。你可以在 onSubmit 回调中根据用户的回答执行相应的操作，例如保存数据、发送请求等。
 
-接下来结合代码来分析，每个提示项的作用分别是啥。
+然后结合代码来分析，每个提示项的作用分别是啥？
 
 ```ts
 {
@@ -887,8 +892,6 @@ function toValidPackageName(projectName) {
 ![截屏2023-08-31 23.16.14](https://cherish-1256678432.cos.ap-nanjing.myqcloud.com/typora/%E6%88%AA%E5%B1%8F2023-08-31%2023.16.14.png)
 
 以上代码，对项目名进行校验，看是否符合内置的规则(类似于npm包名的格式) ，然后对不合法的字符进行校准，生成一个默认的项目名，用户可直接点击确认选择使用这个默认的项目名，或者重新输入一次项目名，如果用户再次输入不合法的项目名，则会出现提示 `Invalid package.json name`, 然后无法继续往下执行，直到用户修改为合法的 项目名。
-
-这里的提示似乎应该是 `Invalid project name`, 功能是对项目名进行校验，却提示 `package.json`  无效，有些奇怪，但也无伤大雅了。（*PS：个人分析，这里可能是一段从别的地方拷贝过来的代码，哈哈，等看到后面的源码再看有没有相关内容！*）
 
 ![截屏2023-08-31 23.26.36](https://cherish-1256678432.cos.ap-nanjing.myqcloud.com/typora/%E6%88%AA%E5%B1%8F2023-08-31%2023.26.36.png)
 
@@ -1016,15 +1019,15 @@ try {
 
 当在选择过程中按下终止快捷键（ctrl + c）时，或者在选择过程中，触发终止条件时（如上文中某选项的 `throw new Error(red('✖') + ' Operation cancelled')` ），则会进入异常捕获中，此时会打印任务执行终止的提示，并结束此进程。
 
-到此，脚手架第一个部分——用户选择部分全都解析完成了，很好理解，就是使用一些更友好的形式（prompts）来收集用户的需求，使用的工具也很简单易懂。
+到此，脚手架第一个部分——“用户自定义配置” 部分全都解析完成了，很好理解，就是使用一些更友好的形式（prompts）来收集用户的需求，使用的工具也很简单易懂。
 
 
 
 接下里看一个 cli 真正的核心功能，根据用户配置生成完整的项目结构。
 
-### 2. 根据用户选择生成合理的项目工程
+### 2. 根据用户选择生成合理的项目工程 🧱
 
-先贴代码：
+还是先贴代码（后面针对具体的代码还会再结合分析，此处可先大致浏览，然后迅速跳过）：
 
 ```ts
 // `initial` won't take effect if the prompt type is null
@@ -1218,7 +1221,7 @@ try {
   console.log()
 ```
 
-第一部分是解析出用户的安装配置项：
+第一部分是解析出用户的自定义安装配置项：
 
 ```ts
 // `initial` won't take effect if the prompt type is null
@@ -1530,8 +1533,6 @@ if (needsPinia && needsRouter) {
     render('entry/default')
 }
 ```
-
-
 
 ```ts
   // Render base template
@@ -2023,9 +2024,11 @@ console.log()
 
 接下来看最后一个部分，项目的打包。
 
+
+
 ## croate-vue 打包、快照和发布功能
 
-### 1. build
+### 1. build 🔨
 
 一个工程化的项目，为了程序的可维护性等方面的需求，总是需要将不同功能的文件按照其职能进行分类管理，但是在实际使用过程中，不可能基于原始工程去直接使用，需要通过打包工具将项目打包为一个庞大的单文件。`create-vue` 打包指令如下：
 
@@ -2140,11 +2143,11 @@ await esbuild.build({
 
 下面分2方面解析一下以上代码，1. esbuild.build `api` 讲解；2. 连个具体的 `plugin` 功能讲解；
 
-#### (1) esbuild.build Api
+#### (1) esbuild.build Api 📖
 
 这部分只要还是翻译官方文档了，因为核心关注点不在这块，属于快速科普，达到能理解的目的即可。
 
-> [esbuild 官方文档](https://esbuild.github.io/api/#transform)
+> 📖 [esbuild 官方文档](https://esbuild.github.io/api/#transform)
 
 Esbuild 支持 `JavaScript` 和 `GoLang` 2种语言。其中 `JavaScript Api` 有异步和同步两种类型。建议使用异步API，因为它适用于所有环境，并且速度更快、功能更强大。同步 Api 仅在 `node` 环境下工作，但在某些情况下也是必要的。
 
@@ -2152,7 +2155,7 @@ Esbuild 支持 `JavaScript` 和 `GoLang` 2种语言。其中 `JavaScript Api` �
 
 > 扩展资料：为什么使用了这2个关键字，在node环境中需要使用 `.mjs` 扩展名？
 >
-> [node.js如何处理esm模块](https://www.ruanyifeng.com/blog/2020/08/how-nodejs-use-es6-module.html)
+> 📖 [node.js如何处理esm模块](https://www.ruanyifeng.com/blog/2020/08/how-nodejs-use-es6-module.html)
 >
 > JavaScript 语言有两种格式的模块，一种是 ES6 模块，简称 ESM；另一种是 Node.js 专用的 CommonJS 模块，简称 CJS。这两种模块不兼容。
 >
@@ -2238,7 +2241,7 @@ plugin API 支持用户将代码注入到构建过程的各个部分。与其他
 >
 > 
 
-#### (2) plugins
+#### (2) plugins 🔌
 
 `esbuild` 的 `plugin` 的用法在上一部分已做出详解。这里我们来分析 `build.mjs ` 中的2个插件的具体作用。
 
@@ -2331,7 +2334,7 @@ export const defaultOptions: DeepRequired<Options> = {
 
 ![image-20230906231747317](https://cherish-1256678432.cos.ap-nanjing.myqcloud.com/typora/image-20230906231747317.png)
 
-### 2. snapshot
+### 2. snapshot 📷
 
 接下来是快照功能，快照功能主要是将前文提到的各种配置进行排列组合，然后生成全部类型的 vue 脚手架工程，并将工程保存在 `playground` 文件夹中， （可能是为了后面做e2e测试的）。如下是官方仓库中的 `playground` 目录：
 
@@ -2629,7 +2632,7 @@ for (const flags of flagCombinations) {
 
 ![image-20230909234953872](https://cherish-1256678432.cos.ap-nanjing.myqcloud.com/typora/image-20230909234953872.png)
 
-### 3. prepublish
+### 3. prepublish 🖥
 
 ```js
 #!/usr/bin/env zx
@@ -2684,5 +2687,29 @@ await $`git push --follow-tags`
 
 ![image-20230910000813062](https://cherish-1256678432.cos.ap-nanjing.myqcloud.com/typora/image-20230910000813062.png)
 
-## 结束了
+## 结束，也是开始
+
+历时近2月，我的第一篇系统性源码解读文章终于接近尾声。
+
+几个月前公司说要写一个内部脚手架，我从 `vue` 官方仓库下载了 `create-vue` 脚手架的代码。最开始只是大致阅读了其主要首先流程，便已对其简洁的实现惊叹不已。任何一个简单的企业应用，仅论代码量都比这个项目要多的多。当时虽能大致理解其实现过程，但对其中的很多细节问题都一无所知，如 "为什么执行 npm create vue 命令， `create-vue ` 工具就会执行？"，"脚手架的终端交互逻辑是怎么实现的？"，"一个完整的 vue 工程是怎么产生的？"，“项目打包时，添加的2个插件的作用是啥？”等等，我都搞不清楚，或者说只有很模糊的认识。最初，我也简单零散的记录了一些学习笔记，但始终不曾深入进去，直到最近的一个契机，促使我开始思考和深入。
+
+从事前端开发工作已满三年，在公司负责一款产品的前端开发工作。我们公司的工作安排某种程度讲，其实不太利于员工的能力提升，只要你稳定参与一个项目的工作，就会一直干这个项目。我从三年前毕业入职到公司开始，始终从事同一个产品，同一个技术栈的相关工作。期间我基于本职工作内容，从各方面寻求一些技术成长。我的产品是一个很老的项目，基于 `vue2.1` 的技术方案，最初，部门只要有新人加入，还无具体工作分配时，都会参与到这个项目中进行一些开发工作，所以代码是有一些混乱的。三年时间，我通过自发的对老旧代码进行**重构**，推动实现 `vue2` 到 `vue3`的**技术升级**，`mvc` 老旧项目前**后端分离**，攻克各类**技术难点**问题，自建部门UI组件库等工作的锻炼，技术和能力得到了一些进步和提升。但越来越感觉在有限的技术圈子中，成长渐行渐缓了。
+
+加之，最近公司的一些工作模式和流程的调整，让我越来越感到技术前景上的灰暗。最新的工作模式中，大量的业务通过引入后端低代码框架进行实现，工作被拆分成一个个简单的小功能点，好似一些包裹、零件。员工则像流水线（公司称之为产线）上的工人，每天完成一些功能点。要求每天发版，对质量要求降低。每个工人机械的处理简单的功能，保证每周的功能点产能。所有内部技术相关活动都宣布终止，全力投入产线，完成产能。在这种工作模式下，个人深感技术热情逐渐湮灭，技术上限提前封顶，不禁悲从中来，同时也危从中来。
+
+当前阶段，迷茫是肯定迷茫的，但是依然要努力拨开迷雾，找到前路。最近阅读了一些关于生活，学习和认知方面的书籍，对我内心有一些触动，其中有3个观点我目前正在践行：
+
+1. 简化自己；
+2. 做最重要的事；
+3. 消除模糊，找到确定性；
+
+以前也写过一些技术文章，近几年很多文章都半途而废了，都不能说草草结尾，很多都没有写到最后就搁置了。
+
+近2月，我舍弃了大部分分散精力的活动，物品，业余时间集中精力准备篇技术分析，力求做到分析清楚其中的每个细节，消除模糊，最终完成了，没有放弃。这篇文章，也算是我践行新的生活方式的一个起点。
+
+往后一年时间，我将继续坚持创作，目标是拿到掘金的优质创作者。这里，即是结束，也是开始！
+
+个人技术能力和写作能力尚存在很多缺陷，文章质量不高，也许存在一些谬误，希望大家不吝指正和指导！
+
+最后，友好交流，勿用恶语，共同进步！
 
