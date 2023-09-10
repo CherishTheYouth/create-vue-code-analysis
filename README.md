@@ -2,6 +2,7 @@
 
 ![create-vue-blog](https://cherish-1256678432.cos.ap-nanjing.myqcloud.com/typora/create-vue-blog.jpg)
 
+
 ## 摘要
 
 本文共分为四个部分，系统解析了`vue.js` 官方脚手架 `create-vue` 的实现细节。
